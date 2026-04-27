@@ -1,0 +1,35 @@
+# 依赖
+frontend/node_modules/
+frontend/dist/
+
+# 数据文件
+*.db
+*.db-journal
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+
+# 其他
+*.tmp
+*.bak
