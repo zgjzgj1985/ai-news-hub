@@ -1,4 +1,4 @@
-"""本地LLM客户端 - 连接Ollama/Qwen3 8B"""
+"""本地LLM客户端 - 连接Ollama/Qwen3.5 9B"""
 
 import json
 import logging
@@ -25,7 +25,7 @@ class LLMResponse:
 
 class LLMClient:
     """
-    本地LLM客户端 - 通过Ollama API调用Qwen3 8B
+    本地LLM客户端 - 通过Ollama API调用Qwen3.5 9B
 
     使用方式：
     ```python
@@ -35,7 +35,7 @@ class LLMClient:
     ```
     """
 
-    DEFAULT_MODEL = "qwen3:8b"
+    DEFAULT_MODEL = "qwen3.5:9b"
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 60
 
@@ -51,7 +51,7 @@ class LLMClient:
         初始化LLM客户端
 
         参数:
-            model: 模型名称，默认 qwen3:8b
+            model: 模型名称，默认 qwen3.5:9b
             base_url: Ollama服务地址，默认 http://localhost:11434
             timeout: 请求超时时间（秒）
             temperature: 温度参数，越低越稳定
@@ -167,7 +167,7 @@ class LLMClient:
         if json_mode:
             payload["format"] = "json"
 
-        # 添加思考标签以适配Qwen3
+        # 添加思考标签以适配Qwen3/Qwen3.5
         if "qwen3" in self.model.lower():
             payload["think"] = False
 

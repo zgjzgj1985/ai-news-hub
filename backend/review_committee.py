@@ -123,7 +123,7 @@ class ReviewCommittee:
     评审委员会 - LLM驱动的严格评审系统
 
     支持两种评审模式：
-    1. LLM模式（优先）：使用Qwen3 8B进行语义理解评审
+    1. LLM模式（优先）：使用Qwen3.5 9B进行语义理解评审
     2. 规则模式（回退）：使用正则和关键词规则评审
     """
 
@@ -217,7 +217,7 @@ class ReviewCommittee:
             raise RuntimeError(
                 "LLM服务不可用！请确保：\n"
                 "1. Ollama服务正在运行 (http://localhost:11434)\n"
-                "2. 已安装 qwen3:8b 模型\n"
+                "2. 已安装 qwen3.5:9b 模型\n"
                 "3. .env 中 LLM_ENABLED=true"
             )
 
@@ -289,7 +289,7 @@ class ReviewCommittee:
             raise RuntimeError(
                 "LLM服务不可用！请确保：\n"
                 "1. Ollama服务正在运行 (http://localhost:11434)\n"
-                "2. 已安装 qwen3:8b 模型\n"
+                "2. 已安装 qwen3.5:9b 模型\n"
                 "3. .env 中 LLM_ENABLED=true"
             )
 

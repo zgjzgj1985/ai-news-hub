@@ -105,8 +105,24 @@
 
         <div v-if="displaySummaryText" class="article-body" v-html="formatSummary(displaySummaryText)"></div>
         <div v-else-if="article.summary" class="article-body" v-html="formatSummary(article.summary)"></div>
-        <div v-else class="empty-summary">
-          <p>暂无摘要内容</p>
+        <div v-else class="no-summary-detail">
+          <div class="no-summary-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </div>
+          <p class="no-summary-title">该来源暂不支持摘要抓取</p>
+          <p class="no-summary-desc">当前文章来自 {{ article.source_name }}，暂无摘要内容</p>
+          <a :href="article.url" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            直接查看原文
+          </a>
         </div>
 
         <div class="article-footer">
@@ -622,6 +638,36 @@ onMounted(load)
   padding: var(--space-8);
   text-align: center;
   color: var(--text-muted);
+}
+
+/* 无摘要详情样式 */
+.no-summary-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-12);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.no-summary-icon {
+  color: var(--warning);
+  opacity: 0.8;
+}
+
+.no-summary-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.no-summary-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  max-width: 400px;
 }
 
 .article-footer {

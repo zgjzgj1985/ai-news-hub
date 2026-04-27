@@ -41,6 +41,30 @@
 
     <p v-if="displaySummary" class="card-summary">{{ truncateSummary(displaySummary) }}</p>
 
+    <!-- 无摘要提示 -->
+    <div v-else class="no-summary-hint">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      <span>该来源暂不支持摘要抓取</span>
+      <a
+        :href="article.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="direct-link"
+        @click.stop
+      >
+        直接查看原文
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      </a>
+    </div>
+
     <div class="card-footer">
       <div class="tags">
         <span
@@ -335,6 +359,37 @@ function truncateSummary(text, maxLength = 200) {
 .grade-d {
   background: #6b7280;
   opacity: 0.6;
+}
+
+.no-summary-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.no-summary-hint svg {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
+.direct-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.direct-link:hover {
+  text-decoration: underline;
 }
 
 .review-rejected {

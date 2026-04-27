@@ -8,6 +8,7 @@ import time
 import chardet
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 
 import feedparser
 import requests
@@ -19,6 +20,29 @@ from scraper.sources import is_academic_source, requires_code
 from review_committee import get_committee
 
 logger = logging.getLogger(__name__)
+
+# 最大重试次数
+MAX_RETRIES = 3
+# 重试间隔（秒）
+RETRY_DELAY = 2
+# 请求超时（秒）
+FETCH_TIMEOUT = 30
+# 连接超时（秒）
+CONNECT_TIMEOUT = 10
+
+# 需要从原网页抓取摘要的来源列表（这些源的 RSS 不提供摘要）
+SOURCES_NEED_PAGE_FETCH = [
+    "Hugging Face Blog",
+    "OpenAI Blog",
+    "Anthropic Blog",
+    "Google DeepMind Blog",
+    "Meta AI Blog",
+    "Mistral AI Blog",
+    "Stability AI Blog",
+    "Windsurf Blog",
+    "GitHub Blog",
+    "Cursor Blog (社区RSS)",
+]
 
 
 def _safe_decode(raw_bytes: bytes) -> str:
@@ -70,35 +94,29 @@ def _safe_log(level, msg, *args):
         pass
 
 
-FETCH_TIMEOUT = 30
+# ============ 常量定义 ============
 
 # 来源特定的质量阈值
-# HN: 超过30分才入库 (HN分数本身已经过社区筛选)
-# Reddit: 超过20赞才入库
-# 一般源: 不设限
 SOURCE_QUALITY_THRESHOLDS = {
-    "Hacker News AI": 30,      # HN 自带评分
-    "Reddit r/LocalLLaMA": 20,  # Reddit 点赞
-    "Reddit r/StableDiffusion": 20,
+    "Hacker News AI": 30,
     "Reddit r/LocalLLaMA": 20,
-    "AI Stack Exchange": 5,     # StackExchange vote
-    # 默认无限制
+    "Reddit r/StableDiffusion": 20,
+    "AI Stack Exchange": 5,
 }
 
-# 每个源每天最多抓取的文章数 (防止噪音源淹没优质内容)
-# 高质量博客类来源可以多抓，RSS 新闻源适当控制
+# 每个源每天最多抓取的文章数
 SOURCE_DAILY_LIMITS = {
-    # 高质量博客 - 可以多抓
+    # 高质量博客
     "Hugging Face Blog": 30,
-    "OpenAI Blog": 30,       # 提高（包含AI编程内容）
-    "Anthropic Blog": 30,     # 提高（包含Claude代码相关）
+    "OpenAI Blog": 30,
+    "Anthropic Blog": 30,
     "Google DeepMind Blog": 20,
     "Meta AI Blog": 20,
     "Stability AI Blog": 20,
     "Mistral AI Blog": 20,
     "机器之心": 30,
     "量子位": 30,
-    # 新闻/社区 - 适度抓取
+    # 新闻/社区
     "Hacker News AI": 20,
     "MIT Technology Review": 20,
     "The Verge AI": 20,
@@ -108,65 +126,58 @@ SOURCE_DAILY_LIMITS = {
     "ArXiv cs.AI": 20,
     "ArXiv cs.CV (视觉)": 20,
     "Papers with Code": 15,
-    # Reddit - 限制抓取（内容质量参差不齐）
-    "r/LocalLLaMA": 15,      # 提高（包含本地AI编程）
+    # Reddit
+    "r/LocalLLaMA": 15,
     "r/StableDiffusion": 10,
-    "r/ComfyUI": 15,         # 提高（包含AI工作流）
-    "r/GameAI": 15,          # 提高（游戏AI）
-    # Vibe Coding 来源 - 提高限制
-    "Windsurf Blog": 20,      # 核心Vibe Coding来源
-    "GitHub Blog": 25,        # 提高（包含AI工具发布）
-    "Cursor Blog (社区RSS)": 25,  # Cursor 官方博客（社区维护版）
-    # 默认 20
+    "r/ComfyUI": 15,
+    "r/GameAI": 15,
+    # Vibe Coding
+    "Windsurf Blog": 20,
+    "GitHub Blog": 25,
+    "Cursor Blog (社区RSS)": 25,
+    # 默认
     "_default": 20,
 }
 
-# Reddit帖子需要更高质量才收录
-REDDIT_MIN_SCORE = 10  # 至少10个 upvotes
-
-# 中文AI媒体的RSS源（用于识别中文内容）
+# 中文AI媒体的RSS源
 CHINESE_AI_FEEDS = ["机器之心", "量子位", "36氪", "雷锋网", "爱范儿"]
 
-# 高质量来源列表 - 来自这些源的文章可以更宽松
+# 高质量来源列表
 HIGH_QUALITY_SOURCES = [
-    # AI 公司博客
     "OpenAI Blog", "Hugging Face Blog", "Anthropic Blog", "Google DeepMind Blog",
     "Meta AI Blog", "Mistral AI Blog", "Stability AI Blog",
-    # 学术与社区
     "The Batch", "Import AI",
     "机器之心", "量子位",
     "AI Stack Exchange", "Data Stack Exchange",
-    # Vibe Coding 核心来源
     "Windsurf Blog", "GitHub Blog", "Cursor Blog (社区RSS)",
 ]
 
 # 无意义标题模式
 MEANINGLESS_TITLE_PATTERNS = [
-    r"^close\??$",           # "Close?" 这种无意义标题
+    r"^close\??$",
     r"^question\??$",
     r"^help\??$",
     r"^\[?deleted\]?$",
     r"^\[?removed\]?$",
-    r"^快讯：",               # 太短的新闻标题
+    r"^快讯：",
     r"^今日热词：",
     r"^今日要闻：",
 ]
 
-# Hacker News AI 关键词 - 文章必须包含至少一个这些关键词
+# Hacker News AI 关键词
 HN_AI_KEYWORDS = [
-    # AI/ML 相关
     "ai", "ml", "machine learning", "deep learning", "neural", "llm", "gpt", "claude", "gemini",
     "transformer", "diffusion", "stable diffusion", "openai", "anthropic", "hugging face",
     "langchain", "rag", "embedding", "fine-tuning", "rlhf", "agent", "copilot", "cursor",
     "midjourney", "sora", "dall-e", "flux", "comfyui", "lora", "controlnet",
-    # 工具/框架
     "github", "open source", "framework", "library", "api", "sdk", "cli",
     "python", "javascript", "typescript", "rust", "golang",
-    # 开发者工具
     "cursor", "windsurf", "copilot", "codeium", "tabnine",
     "v0", "bolt", "lovable", "replit", "perplexity",
 ]
 
+
+# ============ 辅助函数 ============
 
 def compute_hash(title: str, url: str) -> str:
     return hashlib.sha256(f"{title}|{url}".encode()).hexdigest()
@@ -184,43 +195,29 @@ def clean_html(raw_html: str) -> str:
         return ""
     soup = BeautifulSoup(raw_html, "lxml")
     text = soup.get_text(separator=" ", strip=True)
-    # 清理多余空白
     text = re.sub(r'\s+', ' ', text).strip()
     return text[:5000]
 
 
 def is_reddit_template_text(text: str) -> bool:
-    """
-    检测是否为Reddit的模板文本（无意义摘要）。
-    
-    Reddit RSS经常只返回 "submitted by /u/xxx [link] [comments]" 这种模板。
-    """
+    """检测是否为Reddit的模板文本"""
     if not text:
         return True
-    
-    # Reddit 模板模式
     reddit_patterns = [
         r"submitted by\s*/?u/\w+",
         r"\[link\]\s*\[comments\]",
         r"View more community posts",
-        r"^[\s\n]*$",  # 纯空白
+        r"^[\s\n]*$",
     ]
-    
     text_lower = text.lower()
-    
     for pattern in reddit_patterns:
         if re.search(pattern, text, re.IGNORECASE):
             return True
-    
-    # 太短的文本（少于30个字符）
     if len(text.strip()) < 30:
         return True
-    
-    # 如果文本只包含链接和用户名，没有实际内容
     words = text.split()
     if len(words) < 10:
         return True
-        
     return False
 
 
@@ -252,34 +249,19 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
 
 
 def extract_score(entry: dict, source_name: str) -> Optional[int]:
-    """
-    从RSS条目中提取热度评分。
-
-    不同来源有不同的评分机制：
-    - Hacker News: "score" 或 "hn_handler"
-    - Reddit: "reddit_score" 或 "score"
-    - StackExchange: "score"
-    """
+    """从RSS条目中提取热度评分"""
     score = None
-
-    # Hacker News 格式
     if hasattr(entry, 'score'):
         score = entry.get('score')
     elif 'score' in entry:
         score = entry.get('score')
-
-    # Reddit 格式
     if hasattr(entry, 'reddit_score'):
         score = entry.get('reddit_score')
-
-    # 处理字符串格式的分数
     if score is not None:
         if isinstance(score, str):
-            # 尝试提取数字
             match = re.search(r'(\d+)', str(score))
             if match:
                 score = int(match.group(1))
-
     return score
 
 
@@ -301,20 +283,17 @@ def should_include_article(
     title_lower = title.lower().strip()
     combined_text = (title + " " + summary).lower()
 
-    # ========== 1. 检查无意义标题 ==========
+    # 检查无意义标题
     for pattern in MEANINGLESS_TITLE_PATTERNS:
         if re.match(pattern, title_lower, re.IGNORECASE):
-            _safe_log(logging.INFO, "Article filtered by meaningless title: %s", title[:50])
             return False
 
-    # 标题太短（少于5个字符）
+    # 标题太短
     if len(title.strip()) < 5:
-        _safe_log(logging.INFO, "Article filtered by short title: %s", title[:50])
         return False
 
-    # ========== 2. 学术来源必须代码/实战 ==========
+    # 学术来源必须代码/实战
     if is_academic_source(source_name):
-        # 检查是否有GitHub、代码、或实战关键词
         code_indicators = [
             "github", "code", "implementation",
             "tutorial", "example", "demo",
@@ -323,42 +302,32 @@ def should_include_article(
         ]
         has_code = any(indicator in combined_text for indicator in code_indicators)
         if not has_code:
-            _safe_log(logging.INFO, "Academic article filtered - no code/example: %s", title[:50])
             return False
 
-    # ========== 3. 高质量来源：只要标题有意义就收录 ==========
+    # 高质量来源直接收录
     if source_name in HIGH_QUALITY_SOURCES:
         return True
 
-    # ========== 4. Hacker News AI 必须包含AI相关关键词 ==========
+    # Hacker News AI 必须包含AI相关关键词
     if source_name == "Hacker News AI":
         has_ai_keyword = any(kw in combined_text for kw in HN_AI_KEYWORDS)
         if not has_ai_keyword:
-            _safe_log(logging.INFO, "HN AI filtered - no AI keyword: %s", title[:50])
             return False
-        # HN AI 也需要一定分数
         if score is not None and score < 15:
-            _safe_log(logging.INFO, "HN AI filtered - low score (%d): %s", score, title[:50])
             return False
 
-    # ========== 5. Reddit（通过URL识别）==========
+    # Reddit 需要高分数或有实质性摘要
     if "reddit" in title_lower or "/r/" in title:
-        # Reddit 需要高分数
         if score is not None and score < 15:
-            _safe_log(logging.INFO, "Article filtered by Reddit low score: %s (score: %d)", title[:50], score)
             return False
-        # 或者需要有实质性摘要
         if is_reddit_template_text(summary):
-            _safe_log(logging.INFO, "Article filtered by Reddit no summary: %s", title[:50])
             return False
 
-    # ========== 6. 一般来源：检查内容质量 ==========
-    # 标题 + 摘要的总长度需要有一定长度
+    # 一般来源检查内容长度
     if len(combined_text.strip()) < 30:
-        _safe_log(logging.INFO, "Article filtered by short content: %s", title[:50])
         return False
 
-    # ========== 7. 检查推广/垃圾内容 ==========
+    # 检查推广/垃圾内容
     spam_patterns = [
         "sponsored by",
         "[promoted]",
@@ -366,41 +335,113 @@ def should_include_article(
         "buy now",
         "click here",
         "casino",
-        "成人内容",
     ]
     for pattern in spam_patterns:
         if pattern in title_lower:
-            _safe_log(logging.INFO, "Article filtered by spam pattern: %s", title[:50])
             return False
 
     return True
 
 
-def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
+def _is_feed_url_valid(url: str) -> tuple[bool, str]:
     """
-    获取单个订阅源的文章列表。
+    检查 feed URL 是否有效。
 
-    改进点：
-    1. 提取并记录热度分数
-    2. 基于质量阈值过滤
-    3. 每个源限制每日抓取数量
+    返回: (是否有效, 错误信息)
     """
-    articles = []
-    fetched_count = 0
+    if not url:
+        return False, "URL为空"
 
-    # 获取当天的文章数量限制
-    daily_limit = SOURCE_DAILY_LIMITS.get(source.name, SOURCE_DAILY_LIMITS.get("_default", 20))
-
-    db = SessionLocal()
+    # 检查 URL 格式
     try:
-        existing_hashes = {
-            row[0]
-            for row in db.query(Article.content_hash).filter(Article.content_hash.isnot(None)).all()
-        }
-        existing_urls = {row[0] for row in db.query(Article.url).all()}
-    finally:
-        db.close()
+        result = urlparse(url)
+        if not all([result.scheme, result.netloc]):
+            return False, f"无效的URL格式: {url}"
+    except Exception as e:
+        return False, f"URL解析失败: {str(e)}"
 
+    # 检查是否是支持的协议
+    if result.scheme not in ('http', 'https'):
+        return False, f"不支持的协议: {result.scheme}"
+
+    return True, ""
+
+
+def _fetch_page_summary(url: str) -> str:
+    """
+    从原网页抓取摘要。
+
+    适用于 RSS 不提供摘要的来源（如 Hugging Face Blog、OpenAI Blog 等）。
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=(CONNECT_TIMEOUT, FETCH_TIMEOUT))
+        response.raise_for_status()
+
+        # 解析 HTML
+        soup = BeautifulSoup(response.content, "lxml")
+
+        # 尝试提取 meta 描述
+        meta_desc = None
+
+        # Open Graph 描述
+        og_desc = soup.find("meta", property="og:description")
+        if og_desc:
+            meta_desc = og_desc.get("content", "")
+
+        # Twitter 描述
+        if not meta_desc:
+            twitter_desc = soup.find("meta", attrs={"name": "twitter:description"})
+            if twitter_desc:
+                meta_desc = twitter_desc.get("content", "")
+
+        # 标准 meta 描述
+        if not meta_desc:
+            meta_desc_tag = soup.find("meta", attrs={"name": "description"})
+            if meta_desc_tag:
+                meta_desc = meta_desc_tag.get("content", "")
+
+        if meta_desc:
+            return meta_desc.strip()[:500]
+
+        # 尝试提取文章正文的前几段
+        article = soup.find("article") or soup.find("main") or soup.find("div", class_=lambda x: x and "content" in x.lower() if x else False)
+
+        if article:
+            paragraphs = article.find_all("p")
+            if paragraphs:
+                text_parts = []
+                for p in paragraphs[:5]:
+                    text = p.get_text(strip=True)
+                    if len(text) > 50:
+                        text_parts.append(text)
+                    if sum(len(t) for t in text_parts) > 300:
+                        break
+                if text_parts:
+                    return " ".join(text_parts)[:500]
+
+        return ""
+
+    except Exception as e:
+        _safe_log(logging.WARNING, "Failed to fetch page summary for %s: %s", url[:50], str(e))
+        return ""
+
+
+def _fetch_with_retry(source: FeedSource) -> Optional[str]:
+    """
+    带重试的 feed 获取。
+    
+    参数:
+        source: FeedSource 对象
+        
+    返回:
+        feed 内容字符串，失败返回 None
+    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept": "application/rss+xml, application/xml, text/xml, application/atom+xml, */*",
@@ -414,20 +455,123 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0",
     }
+    
+    last_error = ""
+    
+    for attempt in range(MAX_RETRIES):
+        try:
+            # 使用 session 支持连接复用
+            response = requests.get(
+                source.url, 
+                headers=headers, 
+                timeout=(CONNECT_TIMEOUT, FETCH_TIMEOUT),
+                allow_redirects=True,
+                stream=False
+            )
+            
+            # 检查 HTTP 状态码
+            if response.status_code == 404:
+                last_error = f"404 Not Found"
+                # 404 不重试
+                break
+                
+            if response.status_code >= 500:
+                last_error = f"Server Error: {response.status_code}"
+                # 服务器错误，短暂等待后重试
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY * (attempt + 1))
+                continue
+                
+            if response.status_code >= 400:
+                last_error = f"Client Error: {response.status_code}"
+                # 客户端错误，不重试
+                break
+                
+            response.raise_for_status()
+            
+            # 使用智能解码处理编码问题
+            content = _safe_decode(response.content)
+            return content
+            
+        except requests.exceptions.Timeout:
+            last_error = f"请求超时 (尝试 {attempt + 1}/{MAX_RETRIES})"
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+                
+        except requests.exceptions.ConnectionError as e:
+            last_error = f"连接错误: {str(e)[:50]}"
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY * (attempt + 1))
+                
+        except requests.exceptions.RequestException as e:
+            last_error = f"请求异常: {str(e)[:50]}"
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+                
+        except Exception as e:
+            last_error = f"未知错误: {str(e)[:50]}"
+            break
+    
+    _safe_log(logging.ERROR, "Failed to fetch %s after %d attempts: %s", source.name, MAX_RETRIES, last_error)
+    return None
+
+
+def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
+    """
+    获取单个订阅源的文章列表。
+
+    改进点：
+    1. 提取并记录热度分数
+    2. 基于质量阈值过滤
+    3. 每个源限制每日抓取数量
+    4. 容错处理：重试机制、超时处理、编码问题
+    """
+    articles = []
+    fetched_count = 0
+
+    # 获取当天的文章数量限制
+    daily_limit = SOURCE_DAILY_LIMITS.get(source.name, SOURCE_DAILY_LIMITS.get("_default", 20))
+
+    # 检查 URL 有效性
+    is_valid, error_msg = _is_feed_url_valid(source.url)
+    if not is_valid:
+        _safe_log(logging.WARNING, "[%s] Invalid feed URL: %s", source.name, error_msg)
+        return []
+
+    # 加载已存在的文章（用于去重）
+    db = SessionLocal()
+    try:
+        existing_hashes = {
+            row[0]
+            for row in db.query(Article.content_hash).filter(Article.content_hash.isnot(None)).all()
+        }
+        existing_urls = {row[0] for row in db.query(Article.url).all()}
+    except Exception as e:
+        _safe_log(logging.WARNING, "[%s] Failed to load existing articles: %s", source.name, str(e))
+        existing_hashes = set()
+        existing_urls = set()
+    finally:
+        db.close()
+
+    # 带重试的 feed 获取
+    content = _fetch_with_retry(source)
+    
+    if content is None:
+        _safe_log(logging.WARNING, "No content from %s (after retries)", source.name)
+        return []
 
     try:
-        response = requests.get(source.url, headers=headers, timeout=FETCH_TIMEOUT, allow_redirects=True)
-        response.raise_for_status()
-        
-        # 使用智能解码处理编码问题
-        content = _safe_decode(response.content)
         feed = feedparser.parse(content)
     except Exception as e:
-        _safe_log(logging.ERROR, "Failed to fetch %s: %s", source.name, str(e))
+        _safe_log(logging.ERROR, "Failed to parse feed %s: %s", source.name, str(e))
         return []
 
     if not feed.entries:
-        _safe_log(logging.WARNING, "No entries found: %s", source.name)
+        # 检查是否是解析问题
+        if feed.bozo:
+            _safe_log(logging.WARNING, "[%s] Feed has issues (bozo), but may still have entries", source.name)
+        else:
+            _safe_log(logging.WARNING, "No entries found: %s", source.name)
         return []
 
     for entry in feed.entries:
@@ -483,9 +627,13 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
                     if mc.get("description"):
                         summary = clean_html(mc["description"])
                         break
-        
-        # 5. Reddit帖子且没有好摘要时，尝试提取第一段正文
-        if not summary and ("reddit" in source.name.lower() or "r/" in url):
+
+        # 5. 如果仍然没有摘要，且来源需要从网页抓取
+        if not summary and source.name in SOURCES_NEED_PAGE_FETCH:
+            article_url = url.strip()
+            summary = _fetch_page_summary(article_url)
+            if summary:
+                _safe_log(logging.INFO, "[%s] Fetched summary from page for: %s", source.name, title[:40])
             # 尝试从 title 中提取信息作为伪摘要
             # 跳过，因为 Reddit 标题通常已经包含了问题/内容
             pass
@@ -565,7 +713,14 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
 
 
 def fetch_all_feeds() -> dict:
-    """获取所有启用的订阅源。"""
+    """
+    获取所有启用的订阅源。
+    
+    容错处理：
+    1. 单个源失败不影响其他源
+    2. 跳过无效 URL
+    3. 详细记录错误
+    """
     db = SessionLocal()
     try:
         sources = (
@@ -574,41 +729,80 @@ def fetch_all_feeds() -> dict:
             .order_by(FeedSource.priority.desc())
             .all()
         )
-    finally:
+    except Exception as e:
+        _safe_log(logging.ERROR, "Failed to load feed sources: %s", str(e))
         db.close()
-
+        return {
+            "total_added": 0,
+            "total_seen": 0,
+            "sources_count": 0,
+            "errors": [f"数据库错误: {str(e)}"],
+        }
+    finally:
+        # 注意：这里会在 return 之前执行
+        pass
+    
     total_added = 0
     total_seen = 0
-    total_filtered = 0
+    total_skipped = 0
     errors = []
-
-    for source in sources:
+    skipped_reasons = []
+    
+    # 按优先级分组，先处理高质量源
+    high_priority = [s for s in sources if s.priority >= 5]
+    normal_priority = [s for s in sources if s.priority < 5]
+    
+    all_sources = high_priority + normal_priority
+    
+    for source in all_sources:
+        # 跳过无效 URL
+        is_valid, error_msg = _is_feed_url_valid(source.url)
+        if not is_valid:
+            total_skipped += 1
+            skipped_reasons.append(f"{source.name}: {error_msg}")
+            _safe_log(logging.WARNING, "[SKIP] %s - %s", source.name, error_msg)
+            continue
+        
         try:
             articles = fetch_feed(source)
             total_seen += len(articles)
+            
             if articles:
                 db = SessionLocal()
                 try:
                     db.add_all(articles)
                     db.commit()
                     total_added += len(articles)
-                    _safe_log(logging.INFO, "[%s] Added %d new articles", source.name, len(articles))
+                    _safe_log(logging.INFO, "[OK] [%s] Added %d articles", source.name, len(articles))
                 except Exception as e:
                     db.rollback()
-                    _safe_log(logging.ERROR, "DB error saving from %s: %s", source.name, str(e))
+                    error = f"{source.name}: 数据库保存失败 - {str(e)[:50]}"
+                    errors.append(error)
+                    _safe_log(logging.ERROR, "[ERROR] %s", error)
                 finally:
                     db.close()
             else:
-                _safe_log(logging.INFO, "[%s] No new articles (or all filtered)", source.name)
+                _safe_log(logging.INFO, "[EMPTY] [%s] No new articles", source.name)
+                
         except Exception as e:
-            errors.append(f"{source.name}: {str(e)}")
-            _safe_log(logging.ERROR, "Error fetching %s: %s", source.name, str(e))
+            error = f"{source.name}: {str(e)[:100]}"
+            errors.append(error)
+            _safe_log(logging.ERROR, "[ERROR] Fetch failed for %s: %s", source.name, str(e))
 
-        time.sleep(1)  # 避免请求过快
+        # 请求间隔
+        time.sleep(0.5)
 
-    return {
+    db.close()
+    
+    result = {
         "total_added": total_added,
         "total_seen": total_seen,
         "sources_count": len(sources),
+        "sources_skipped": total_skipped,
         "errors": errors,
     }
+    
+    if skipped_reasons:
+        result["skipped_reasons"] = skipped_reasons
+    
+    return result

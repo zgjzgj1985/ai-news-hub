@@ -77,7 +77,7 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">LLM 智能评审</h2>
-            <p class="section-desc">基于本地 Qwen3 8B 模型进行深度语义评审</p>
+            <p class="section-desc">基于本地 Qwen3.5 9B 模型进行深度语义评审</p>
           </div>
           <button class="btn btn-icon btn-ghost" @click="loadLLMStatus" title="刷新状态">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -129,8 +129,8 @@
           </svg>
           <div>
             <p class="warning-title">Ollama 服务未运行</p>
-            <p class="warning-desc">请确保已安装并启动 Ollama，且已下载 qwen3:8b 模型</p>
-            <code class="warning-cmd">ollama pull qwen3:8b && ollama serve</code>
+            <p class="warning-desc">请确保已安装并启动 Ollama，且已下载 qwen3.5:9b 模型</p>
+            <code class="warning-cmd">ollama pull qwen3.5:9b && ollama serve</code>
           </div>
         </div>
 

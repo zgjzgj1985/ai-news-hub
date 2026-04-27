@@ -25,7 +25,7 @@
 | 后端 | Python 3.11+ / FastAPI / SQLAlchemy |
 | 前端 | Vue 3 / Vite / Pinia |
 | 数据库 | SQLite |
-| AI评审 | 本地 LLM (Qwen3 8B via Ollama) |
+| AI评审 | 本地 LLM (Qwen3.5 9B via Ollama) |
 | 调度器 | APScheduler |
 
 ## 项目结构
@@ -71,8 +71,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 # Windows: 从 https://ollama.com/download 下载安装
 
-# 下载 Qwen3 8B 模型
-ollama pull qwen3:8b
+# 下载 Qwen3.5 9B 模型
+ollama pull qwen3.5:9b
 
 # 启动 Ollama 服务
 ollama serve
@@ -86,7 +86,7 @@ cp .env.example .env  # 或手动创建 .env 文件
 
 # .env 配置内容：
 LLM_ENABLED=true
-LLM_MODEL=qwen3:8b
+LLM_MODEL=qwen3.5:9b
 LLM_BASE_URL=http://localhost:11434
 ```
 
@@ -130,7 +130,7 @@ npm run dev
 
 ### 3. LLM 评审委员会
 
-**核心特性**：使用本地 Qwen3 8B 模型对每篇文章进行严格评审，聚焦内容的**实用价值**和**落地可行性**。
+**核心特性**：使用本地 Qwen3.5 9B 模型对每篇文章进行严格评审，聚焦内容的**实用价值**和**落地可行性**。
 
 **评审维度**（按重要性排序）：
 
