@@ -18,10 +18,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 db_url = os.getenv("DATABASE_URL", "sqlite:///../data/articles.db")
 if db_url.startswith("sqlite:///"):
     rel_path = db_url.replace("sqlite:///", "")
-    db_path = (BASE_DIR / rel_path).resolve()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
 # 使用绝对路径确保中文路径正确处理
-db_url = f"sqlite:///{db_path.as_posix()}"
+db_path = (BASE_DIR / rel_path).resolve()
+db_path.parent.mkdir(parents=True, exist_ok=True)
+# 避免 as_posix() 中文乱码，直接用正斜杠构造 URI
+db_url = f"sqlite:///{db_path.as_posix().replace(chr(92), '/')}"
 
 # 创建引擎时启用UTF-8支持
 engine = create_engine(
@@ -67,6 +68,9 @@ class Article(Base):
     review_result = Column(JSON, nullable=True, default=None)       # 详细评审结果
     review_verdict = Column(Text, nullable=True, default=None)      # 最终裁决理由
     reviewed_at = Column(DateTime, nullable=True)                   # 评审时间
+    # 深度评审标记：是否已通过阅读正文完成深度评分（后台运行，前端不显示分数）
+    deep_review_done = Column(Boolean, default=False)
+    deep_review_body = Column(Text, nullable=True)  # 抓取的正文内容（不暴露给前端）
 
     bookmark = relationship("Bookmark", back_populates="article", uselist=False)
 
@@ -77,6 +81,7 @@ class Article(Base):
         Index("ix_articles_score", "score"),
         Index("ix_articles_review_grade", "review_grade"),
         Index("ix_articles_translated", "is_translated"),
+        Index("ix_articles_deep_review_done", "deep_review_done"),
     )
 
 
@@ -138,7 +143,6 @@ class ArticleRead(ArticleBase):
     id: int
     fetched_at: datetime
     is_bookmarked: bool = False
-    review_result: Optional[dict] = None  # 详细评审结果
     translated_at: Optional[datetime] = None  # 翻译时间
 
     @classmethod
@@ -162,7 +166,6 @@ class ArticleRead(ArticleBase):
             review_grade=article.review_grade,
             review_score=article.review_score,
             review_verdict=article.review_verdict,
-            review_result=article.review_result,
             is_translated=article.is_translated,
             translated_at=article.translated_at,
         )

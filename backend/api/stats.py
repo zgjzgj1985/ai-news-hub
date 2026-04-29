@@ -24,12 +24,13 @@ def get_stats(
     db: Session = Depends(get_db),
     grade: Optional[str] = Query(None, description="Filter by review grade: A/B/C/D or combined like 'AB'"),
 ):
-    # 只统计通过评审的内容（A/B/C 级），D 级是垃圾信息不计入
-    base_filter = Article.review_grade != 'D'
-
+    # 只统计通过深度评审的内容（A/B/C 级），D 级是垃圾信息不计入
+    base_filter = Article.deep_review_done == True
     if grade:
         grades = list(grade.upper())
         base_filter = base_filter & Article.review_grade.in_(grades)
+    else:
+        base_filter = base_filter & (Article.review_grade != 'D')
 
     total_articles = db.query(Article).filter(base_filter).count()
     total_bookmarks = db.query(Bookmark).count()
@@ -48,14 +49,14 @@ def get_stats(
 
     from sqlalchemy import text
     tag_counts: dict[str, int] = {}
-    # 只统计通过评审的内容的标签
-    grade_filter_sql = ""
+    # 只统计通过深度评审的内容的标签
+    grade_filter_sql = " AND articles.review_grade != 'D'"
     if grade:
         grade_list = "('" + "','".join(list(grade.upper())) + "')"
         grade_filter_sql = f" AND articles.review_grade IN {grade_list}"
     result = db.execute(text(
         "SELECT json_each.value, COUNT(*) FROM articles, json_each(articles.tags) "
-        "WHERE articles.review_grade != 'D'" + grade_filter_sql +
+        "WHERE articles.deep_review_done = 1" + grade_filter_sql +
         " GROUP BY json_each.value"
     ))
     for tag_name, count in result.fetchall():
@@ -74,11 +75,12 @@ def get_stats(
 @router.get("/stats/review")
 def get_review_stats(db: Session = Depends(get_db)):
     """获取评审统计信息"""
-    # 统计各评级数量
+    # 统计各评级数量（仅深度评审完成的）
     grade_stats = db.query(
         Article.review_grade,
         func.count(Article.id).label("count")
     ).filter(
+        Article.deep_review_done == True,
         Article.review_grade.isnot(None)
     ).group_by(Article.review_grade).all()
 
@@ -88,7 +90,9 @@ def get_review_stats(db: Session = Depends(get_db)):
             grade_counts[grade] = count
 
     total_reviewed = sum(grade_counts.values())
-    total_pending = db.query(Article).filter(Article.review_grade.is_(None)).count()
+    total_pending = db.query(Article).filter(
+        Article.deep_review_done == False
+    ).count()
 
     # 计算通过率（A、B为通过）
     pass_rate = 0.0
@@ -110,6 +114,7 @@ def get_review_stats(db: Session = Depends(get_db)):
         "grade_counts": grade_counts,
         "grade_distribution": grade_distribution,
         "committee_status": "active",
+        "deep_review_mode": True,
     }
 
 

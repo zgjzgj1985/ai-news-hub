@@ -432,14 +432,15 @@ def _fetch_page_summary(url: str) -> str:
             paragraphs = article.find_all("p")
             if paragraphs:
                 text_parts = []
-                for p in paragraphs[:5]:
+                for p in paragraphs[:3]:
                     text = p.get_text(strip=True)
-                    if len(text) > 50:
+                    if len(text) > 30:
                         text_parts.append(text)
                     if sum(len(t) for t in text_parts) > 300:
                         break
                 if text_parts:
-                    return " ".join(text_parts)[:500]
+                    # 使用双换行分隔段落，保留结构
+                    return "\n\n".join(text_parts)[:500]
 
         return ""
 

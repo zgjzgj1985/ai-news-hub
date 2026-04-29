@@ -177,10 +177,8 @@ class ReviewCommittee:
 
     @property
     def llm_client(self) -> Optional[LLMClient]:
-        """懒加载LLM客户端"""
-        if self._llm_client is None:
-            self._llm_client = get_llm_client()
-        return self._llm_client
+        """每次返回新实例，避免跨事件循环复用导致连接池失效"""
+        return get_llm_client()
 
     def review(
         self,

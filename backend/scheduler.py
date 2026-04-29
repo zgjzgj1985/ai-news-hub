@@ -31,8 +31,19 @@ def fetch_job():
         _log(logging.ERROR, "[Scheduler] Feed fetch failed: %s", str(e))
 
 
+def deep_review_job():
+    """后台深度评审：抓取文章正文后让 LLM 阅读理解并评分。"""
+    _log(logging.INFO, "[DeepReview] Starting deep review job at %s", datetime.utcnow())
+    try:
+        from scraper.deep_reviewer import run_deep_review_sync
+        result = run_deep_review_sync(limit=20, delay=1.5)
+        _log(logging.INFO, "[DeepReview] Deep review completed: %s", result)
+    except Exception as e:
+        _log(logging.ERROR, "[DeepReview] Deep review failed: %s", str(e))
+
+
 def review_backlog_job():
-    """后台批量评审未评审的历史文章"""
+    """兜底评审：仅基于 RSS 摘要评分（正文抓取失败时使用）。"""
     _log(logging.INFO, "[ReviewBacklog] Starting backlog review at %s", datetime.utcnow())
     try:
         # 在新线程中运行异步评审任务
@@ -197,16 +208,17 @@ def init_scheduler():
         replace_existing=True,
     )
 
-    # 添加评审后台任务调度（每30分钟评审50篇文章）
+    # 深度评审后台任务（每30分钟处理20篇，抓取正文后 LLM 评分）
+    # 优先级：先处理 deep_review_done=False 的文章
     scheduler.add_job(
-        review_backlog_job,
+        deep_review_job,
         IntervalTrigger(minutes=30),
-        id="review_backlog",
-        name="Review Backlog Articles",
+        id="deep_review",
+        name="Deep Review Articles (Fetch Body + LLM)",
         replace_existing=True,
     )
 
-    # 添加翻译后台任务调度（每45分钟翻译30篇文章）
+    # 翻译后台任务（每45分钟翻译30篇）
     scheduler.add_job(
         translate_backlog_job,
         IntervalTrigger(minutes=45),

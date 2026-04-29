@@ -24,13 +24,16 @@ def list_articles(
     keyword: Optional[str] = Query(None, description="Search in title/summary"),
     source: Optional[str] = Query(None, description="Filter by source name"),
     grade: Optional[str] = Query(None, description="Filter by review grade: A/B/C/D or combined like 'AB'"),
-    min_score: Optional[int] = Query(None, ge=0, le=50, description="Minimum review score"),
+    min_score: Optional[int] = Query(None, ge=0, le=780, description="Minimum review score (0-780)"),
     sort: str = Query("newest", regex="^(newest|oldest)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     q = db.query(Article)
+
+    # 核心过滤：只有完成深度评审的文章才展示（无评分内容不上线）
+    q = q.filter(Article.deep_review_done == True)
 
     # 默认过滤：D 级内容不返回（垃圾信息不进列表）
     q = q.filter(Article.review_grade != 'D')
@@ -71,7 +74,10 @@ def list_articles(
 
 @router.get("/{article_id}", response_model=ArticleRead)
 def get_article(article_id: int, db: Session = Depends(get_db)):
-    article = db.query(Article).filter(Article.id == article_id).first()
+    article = db.query(Article).filter(
+        Article.id == article_id,
+        Article.deep_review_done == True,
+    ).first()
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     return ArticleRead.from_orm(article)

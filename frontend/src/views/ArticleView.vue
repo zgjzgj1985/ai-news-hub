@@ -135,7 +135,7 @@ function formatSummary(text) {
   if (!text) return ''
   text = text.replace(/^Back to Articles\s*/i, '').trim()
   if (text.includes('<p') || text.includes('<br') || text.includes('<div')) {
-    return text.replace(/<p[^>]*>/gi, '<p>').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '</p>\n').replace(/<[^>]+>/g, '').trim()
+    text = text.replace(/<p[^>]*>/gi, '<p>').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '</p>\n').replace(/<[^>]+>/g, '').trim()
   }
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\t/g, ' ').replace(/\u00a0/g, ' ').replace(/[ ]{2,}/g, ' ')
   const paragraphs = text.split(/\n{2,}/).filter(p => p.trim())
@@ -159,13 +159,47 @@ function formatSummary(text) {
     paragraphs.length = 0
     paragraphs.push(...grouped)
   }
-  return paragraphs.map((p, i) => `<p>${escapeHtml(p)}</p>`).join('')
+  if (paragraphs.length < 2) {
+    const forced = []
+    for (let i = 0; i < text.length; i += 180) {
+      forced.push(text.slice(i, i + 180))
+    }
+    if (forced.length > 1) {
+      return forced.map(p => `<p>${renderFormatted(p)}</p>`).join('')
+    }
+  }
+  return paragraphs.map(p => `<p>${renderFormatted(p)}</p>`).join('')
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
+function renderFormatted(text) {
+  // 常见 Markdown 格式转换为 HTML
+  let t = text
+    // 代码：``内联代码`` > `代码`（后者优先匹配）
+    .replace(/``([^`]+)``/g, '<code>$1</code>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // 粗体：**text** 或 __text__
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    // 斜体：*text* 或 _text_（排除 URL 中的下划线）
+    .replace(/(?<!\/)\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/(?<!\/)\b_([^_\n]+)_(?!\/)/g, '<em>$1</em>')
+    // 删除线：~~text~~
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+  // 最后转义剩余的危险 HTML 标签和属性
+  t = t
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // 还原之前转换的 Markdown HTML 标签中的转义字符
+    .replace(/&lt;code&gt;/g, '<code>')
+    .replace(/&lt;\/code&gt;/g, '</code>')
+    .replace(/&lt;strong&gt;/g, '<strong>')
+    .replace(/&lt;\/strong&gt;/g, '</strong>')
+    .replace(/&lt;em&gt;/g, '<em>')
+    .replace(/&lt;\/em&gt;/g, '</em>')
+    .replace(/&lt;del&gt;/g, '<del>')
+    .replace(/&lt;\/del&gt;/g, '</del>')
+  return t
 }
 
 async function load() {
@@ -310,15 +344,47 @@ onMounted(load)
 }
 
 .body :deep(p) {
-  margin: 0 0 1.5em;
-  line-height: 1.8;
+  margin: 0 0 1.8em;
+  line-height: 2;
+  text-align: justify;
 }
 
 .body :deep(p:first-child) {
   font-family: var(--font-serif);
   font-size: var(--font-size-lg);
   color: var(--text-primary);
-  line-height: 1.7;
+  line-height: 1.85;
+  margin-bottom: 2em;
+}
+
+.body :deep(p:nth-child(n+2)) {
+  color: var(--text-secondary);
+}
+
+.body :deep(strong),
+.body :deep(b) {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.body :deep(em),
+.body :deep(i) {
+  font-style: italic;
+}
+
+.body :deep(code) {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.875em;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.body :deep(del) {
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 
 .no-summary {

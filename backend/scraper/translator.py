@@ -54,11 +54,17 @@ def detect_language(text: str) -> str:
     return "en"
 
 
-TRANSLATION_PROMPT = """将以下英文翻译为简体中文（简洁准确）：
+TRANSLATION_PROMPT = """将以下英文翻译为简体中文：
 
+要求：
+1. 保持原文的段落结构，用换行分隔段落，不要合并成一段
+2. 简洁准确，不添加额外解释
+3. 技术术语保持准确
+
+原文：
 {text}
 
-中文："""
+中文翻译："""
 
 
 async def translate_text(text: str, max_length: int = 2000) -> Optional[str]:

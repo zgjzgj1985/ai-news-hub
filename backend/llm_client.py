@@ -300,21 +300,6 @@ class LLMClient:
         return obj
 
 
-# 全局LLM客户端实例
-_llm_client: Optional[LLMClient] = None
-
-
 def get_llm_client() -> LLMClient:
-    """获取全局LLM客户端实例"""
-    global _llm_client
-    if _llm_client is None:
-        _llm_client = LLMClient()
-    return _llm_client
-
-
-async def close_llm_client():
-    """关闭全局LLM客户端"""
-    global _llm_client
-    if _llm_client:
-        await _llm_client.close()
-        _llm_client = None
+    """获取全局LLM客户端实例（每次返回新实例，避免跨事件循环复用导致连接池失效）"""
+    return LLMClient()
