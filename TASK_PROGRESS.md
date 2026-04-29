@@ -1,6 +1,136 @@
 # 任务进度记录
 
 ## 当前任务
+深度评审系统（后台 LLM 阅读理解评分）
+
+## 任务背景
+用户反馈"画布"（Cursor Canvases）文章被评为A级，但实际内容质量有限。
+
+**问题根因**：
+- 旧评审仅基于 RSS 摘要（可能只有一句话）进行评分
+- Cursor Blog 来源有双重加成（系统提示词 + 来源加权），导致评分虚高
+- 摘要内容单薄时，LLM 仍然能通过"信任来源"拿到高分
+
+**用户需求**：
+- 让 LLM 在后台深度阅读文章正文后进行评分
+- 前端不显示评分数字，只显示 A/B/C/D 徽章
+- 只有完成深度评审的文章才展示在前端
+
+## 任务计划
+- [x] 步骤1：修改数据库模型，添加 deep_review_done 字段
+- [x] 步骤2：实现深度评审模块 deep_reviewer.py（抓取正文 + LLM评分）
+- [x] 步骤3：修改 scheduler 后台任务，替换为深度评审调度
+- [x] 步骤4：修改 API 过滤逻辑，只展示已完成深度评审的文章
+- [x] 步骤5：测试验证（语法检查全部通过）
+
+## 修改的文件
+
+### 1. backend/database.py
+- 新增字段：`deep_review_done` (Boolean) - 标记是否完成深度评审
+- 新增字段：`deep_review_body` (Text) - 抓取的正文长度（不暴露内容）
+- 新增索引：`ix_articles_deep_review_done`
+- 从 `ArticleRead` schema 中移除 `review_result`（不暴露给前端）
+- `review_score` 范围更新为 0-780（6维度×10分）
+
+### 2. backend/scraper/deep_reviewer.py（新建）
+- `fetch_article_body()`：4层策略抓取文章正文（article > main > content div > heuristics）
+- `fetch_youtube_transcript()`：YouTube 字幕获取（预留接口）
+- `deep_review_single_article()`：抓取正文 + 构建评审提示词 + LLM评分 + 应用来源加权
+- `batch_deep_review()`：批量处理，每次最多30篇，每篇间隔1秒
+- `run_deep_review_sync()`：同步入口，供 scheduler 调用
+
+### 3. backend/scheduler.py
+- 新增 `deep_review_job()` 函数
+- 调度：每30分钟处理20篇
+- 优先级：先处理 `deep_review_done=False` 的文章
+- 删除了旧的 `review_backlog` 调度（仅基于摘要评分的旧逻辑）
+
+### 4. backend/api/articles.py
+- `GET /api/articles`：默认过滤 `deep_review_done=True`（无评分内容不上线）
+- `GET /api/articles/{id}`：详情页也要求 `deep_review_done=True`
+- `min_score` 范围更新为 0-780
+
+### 5. backend/api/stats.py
+- `GET /api/stats`：统计时增加 `deep_review_done=True` 过滤
+- `GET /api/stats/review`：
+  - 统计改为仅统计深度评审完成的文章
+  - .pending 改为统计 `deep_review_done=False` 的文章
+  - 新增 `"deep_review_mode": true` 标志
+
+## 设计亮点
+
+### 评分不暴露
+- `ArticleRead` schema 不包含 `review_result`
+- `review_score` 不传给前端（前端不读取该字段）
+- 前端只展示 A/B/C/D 徽章
+
+### 过滤机制
+- `deep_review_done=False` 的文章：
+  - 不出现在列表 API 中
+  - 不出现在详情页中
+  - 统计 API 不计入
+- 只有完成深度评审的文章才能展示
+
+### 后台持续运行
+- 每30分钟自动处理20篇未评审的文章
+- 越新的文章越优先处理
+- LLM 自动截断超长正文（8000字符上限）
+
+## 开始时间
+2026-04-29 14:58
+
+## 完成时间
+2026-04-29 15:05
+
+---
+
+## 任务背景
+用户反馈摘要没有段落格式，是一整段密密麻麻的文字，读起来很吃力。
+
+## 任务计划
+- [x] 步骤1：改进 formatSummary 函数，增加字符数强制分段兜底逻辑
+- [x] 步骤2：美化 ArticleView.vue 摘要段落样式（间距、行高）
+- [x] 步骤3：优化 _fetch_page_summary 保留段落结构
+- [x] 步骤4：改进翻译提示词，要求保持段落格式
+- [x] 步骤5：测试验证效果
+
+## 修改内容
+
+### 1. 前端分段逻辑（ArticleView.vue）
+- 新增字符数强制分段兜底：当标点分组仍为单段落时，按每180字强制拆分
+- 确保无论原文是否有标点，都能获得多个段落
+
+### 2. 段落样式美化（ArticleView.vue）
+- 段落间距从 1.5em 增加到 1.8em
+- 行高从 1.8 提升到 2.0
+- 新增两端对齐（text-align: justify）
+- 首段使用大字号衬线字体突出显示
+- 后续段落使用次要颜色，提升层次感
+
+### 3. 后端摘要抓取（rss_parser.py）
+- 从提取5段改为提取3段，保持精炼
+- 最低段落长度阈值从50字降到30字，捕获更多短段落
+- 使用双换行（\n\n）分隔段落，保留结构
+- 总体长度限制仍为500字
+
+### 4. 翻译提示词（translator.py）
+- 明确要求保持原文段落结构
+- 用换行分隔段落，不要合并成一段
+- 添加技术术语准确性要求
+
+## 验证结果
+- 前端构建：成功
+- Python 语法检查：成功
+
+## 开始时间
+2026-04-29 14:06
+
+## 完成时间
+2026-04-29 14:08
+
+---
+
+## 当前任务
 英文文章翻译
 
 ## 任务计划
