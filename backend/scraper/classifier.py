@@ -403,7 +403,7 @@ SOURCE_QUALITY_WEIGHT = {
     "Cursor Blog (社区RSS)": 3.0,
     "GitHub Blog": 2.5,
     "GitHub Trending": 2.0,
-    "Simon Willison": 3.0,  # AI Coding 专家
+    "Simon Willison": 1.0,  # AI Coding 专家，但对 vibe coding 持批评态度
 
     # DEV.to 开发者社区 - Vibe Coding 内容丰富
     "DEV.to": 2.5,
@@ -527,14 +527,23 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
     is_academic = is_academic_content(combined_lower, source_name)
 
     # Vibe Coding 核心来源列表
+    # 优先级降低：Simon Willison 持批评态度，降低权重
     VIBE_CODING_CORE_SOURCES = [
-        # AI Coding 工具
-        "Cursor Blog", "Cursor Blog (社区RSS)", "GitHub Blog", "GitHub Trending",
-        "Simon Willison",
-        # DEV.to 开发者社区
+        # AI Coding 工具 - 最高优先级
+        "Cursor Blog", "Cursor Blog (社区RSS)", "Cursor Changelog",
+        "GitHub Blog", "GitHub Trending",
+        # DEV.to 开发者社区 - 高质量教程
         "DEV.to", "DEV.to Cursor", "DEV.to AI Coding", "DEV.to LLM", "DEV.to AI",
-        # Newsletter
+        # Newsletter - 仅高质量内容
         "Latent Space",
+    ]
+
+    # Vibe Coding 降权来源 - 这些来源内容参差不齐
+    VIBE_CODING_WEAK_SOURCES = [
+        "Simon Willison",  # 对 Vibe Coding 持批评态度
+        "Latent Space Podcast",  # 播客转文字，质量较低
+        "Import AI Newsletter",  # 新闻性质为主
+        "The Gradient",  # 学术性质为主
     ]
 
     tag_scores = {}
@@ -553,9 +562,13 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
         elif source_name in PRACTICAL_SOURCES and tag in ["使用技巧", "工具推荐", "生产落地"]:
             source_weight *= 1.5
 
-        # Vibe Coding 来源优先匹配 vibe_coding 标签
+        # Vibe Coding 来源加权
         if source_name in VIBE_CODING_CORE_SOURCES and tag == "vibe_coding":
-            source_weight *= 2.0  # Vibe Coding 来源的文章更容易被标记为 vibe_coding
+            source_weight *= 2.5  # 核心来源大幅加权
+
+        # Vibe Coding 降权来源 - 降低权重
+        if source_name in VIBE_CODING_WEAK_SOURCES and tag == "vibe_coding":
+            source_weight *= 0.3  # 降权至 30%
 
         score *= source_weight
 
@@ -608,7 +621,13 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
     # Vibe Coding 核心来源的文章，即使分数不够也优先打 vibe_coding 标签
     if source_name in VIBE_CODING_CORE_SOURCES and "vibe_coding" not in matched_tags:
         vibe_score = _calculate_tag_score("vibe_coding", text_lower, title_lower)
-        if vibe_score >= 1.0:  # 只要有1分以上就打标签
+        if vibe_score >= 3.0:  # 提高阈值至 3 分
+            matched_tags.append("vibe_coding")
+
+    # Vibe Coding 降权来源 - 只有高质量内容才打标签
+    if source_name in VIBE_CODING_WEAK_SOURCES and "vibe_coding" not in matched_tags:
+        vibe_score = _calculate_tag_score("vibe_coding", text_lower, title_lower)
+        if vibe_score >= 5.0:  # 降权来源需要 5 分以上
             matched_tags.append("vibe_coding")
 
     # 如果没有任何标签命中，但来源是AI专业源，默认打AI前沿

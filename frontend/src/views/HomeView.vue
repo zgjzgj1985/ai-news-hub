@@ -44,6 +44,13 @@
         >
           {{ item.label }}<span class="tag-count">{{ item.count }}</span>
         </button>
+        <button
+          class="tag-btn tag-vibe"
+          :class="{ active: store.activeTag === 'vibe_coding' }"
+          @click="handleTagClick('vibe_coding')"
+        >
+          Vibe Coding<span class="tag-count">{{ vibeCount }}</span>
+        </button>
       </div>
 
       <!-- 文章列表 -->
@@ -120,6 +127,10 @@ const filterItems = computed(() => {
     { label: '使用技巧', value: '使用技巧', count: tagMap['使用技巧'] || 0 },
     { label: '工具', value: '工具推荐', count: tagMap['工具推荐'] || 0 },
   ]
+})
+
+const vibeCount = computed(() => {
+  return store.stats?.tag_counts?.['vibe_coding'] || 0
 })
 
 function handleTagClick(tag) {
@@ -285,6 +296,23 @@ onMounted(() => {
 
 .tag-btn:not(.active) .tag-count {
   background: var(--text-muted);
+}
+
+.tag-vibe {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tag-vibe:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+.tag-vibe.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-base);
 }
 
 /* 文章列表 */
