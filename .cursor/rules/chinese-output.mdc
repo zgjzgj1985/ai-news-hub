@@ -1,6 +1,8 @@
 ---
 description: 强制 AI 使用简体中文输出内容和思维链
 alwaysApply: true
+version: v1.0.0
+lastUpdated: 2026-04-29
 ---
 
 # 简体中文输出规范
