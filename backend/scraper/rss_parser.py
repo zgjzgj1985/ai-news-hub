@@ -1,6 +1,5 @@
 """RSS parser for fetching and parsing feed entries with quality filtering."""
 
-import asyncio
 import hashlib
 import logging
 import re
@@ -22,13 +21,19 @@ from review_committee import get_committee
 logger = logging.getLogger(__name__)
 
 # 最大重试次数
-MAX_RETRIES = 3
+MAX_RETRIES = 2
 # 重试间隔（秒）
-RETRY_DELAY = 2
-# 请求超时（秒）
-FETCH_TIMEOUT = 30
+RETRY_DELAY = 1
+# 请求超时（秒）- 降低超时加快失败
+FETCH_TIMEOUT = 15
 # 连接超时（秒）
-CONNECT_TIMEOUT = 10
+CONNECT_TIMEOUT = 8
+# 单个 feed 最大处理时间（秒）
+FEED_MAX_TIME = 60
+# 全局抓取超时（秒）
+GLOBAL_TIMEOUT = 300
+# LLM 评审超时（秒）- LLM 响应约 3-5 秒，留足余量
+REVIEW_TIMEOUT = 20
 
 # 需要从原网页抓取摘要的来源列表（这些源的 RSS 不提供摘要）
 SOURCES_NEED_PAGE_FETCH = [
@@ -42,6 +47,19 @@ SOURCES_NEED_PAGE_FETCH = [
     "Windsurf Blog",
     "GitHub Blog",
     "Cursor Blog (社区RSS)",
+]
+
+# 慢速订阅源（需要更长的超时）及其超时配置
+# 格式: {来源名称: (连接超时秒, 读取超时秒)}
+SLOW_FEED_TIMEOUTS = {
+    "Latent Space Podcast": (15, 60),
+}
+
+# 代理干扰的域名列表：请求这些域名时禁用代理
+NO_PROXY_DOMAINS = [
+    "latent.space",
+    "api.substack.com",
+    "www.latent.space",
 ]
 
 
@@ -100,7 +118,6 @@ def _safe_log(level, msg, *args):
 SOURCE_QUALITY_THRESHOLDS = {
     "Hacker News AI": 30,
     "Reddit r/LocalLLaMA": 20,
-    "Reddit r/StableDiffusion": 20,
     "AI Stack Exchange": 5,
 }
 
@@ -128,7 +145,6 @@ SOURCE_DAILY_LIMITS = {
     "Papers with Code": 15,
     # Reddit
     "r/LocalLLaMA": 15,
-    "r/StableDiffusion": 10,
     "r/ComfyUI": 15,
     "r/GameAI": 15,
     # Vibe Coding
@@ -455,16 +471,33 @@ def _fetch_with_retry(source: FeedSource) -> Optional[str]:
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0",
     }
-    
+
+    # 检查是否有慢速源的特殊超时配置
+    conn_timeout = CONNECT_TIMEOUT
+    fetch_timeout = FETCH_TIMEOUT
+    if source.name in SLOW_FEED_TIMEOUTS:
+        conn_timeout, fetch_timeout = SLOW_FEED_TIMEOUTS[source.name]
+        _safe_log(logging.INFO, "[%s] Using slow feed timeout: connect=%ds, fetch=%ds", source.name, conn_timeout, fetch_timeout)
+
+    # 检查是否需要禁用代理（解决代理干扰导致超时的问题）
+    from urllib.parse import urlparse
+    parsed = urlparse(source.url)
+    no_proxy = parsed.netloc in NO_PROXY_DOMAINS
+
     last_error = ""
-    
+
     for attempt in range(MAX_RETRIES):
         try:
-            # 使用 session 支持连接复用
+            # 禁用代理的域名需要关闭 keep-alive（设置 Connection: close）
+            # 否则代理会复用连接导致后续请求超时
+            req_headers = dict(headers)
+            if no_proxy:
+                req_headers["Connection"] = "close"
+
             response = requests.get(
-                source.url, 
-                headers=headers, 
-                timeout=(CONNECT_TIMEOUT, FETCH_TIMEOUT),
+                source.url,
+                headers=req_headers,
+                timeout=(conn_timeout, fetch_timeout),
                 allow_redirects=True,
                 stream=False
             )
@@ -516,9 +549,51 @@ def _fetch_with_retry(source: FeedSource) -> Optional[str]:
     return None
 
 
-def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
+def _fetch_feed_with_timeout(source: FeedSource, max_articles: int = 50) -> list[Article]:
     """
-    获取单个订阅源的文章列表。
+    fetch_feed 的包装函数，带超时保护。
+
+    使用线程实现超时控制，避免单个慢速 feed 阻塞整个抓取。
+    """
+    import threading
+
+    # 慢速源使用更长的总超时
+    feed_max_time = FEED_MAX_TIME
+    if source.name in SLOW_FEED_TIMEOUTS:
+        # 慢速源：总超时 = 连接超时 * 重试次数 + 读取超时 * 重试次数 + 评审超时缓冲
+        conn_t, fetch_t = SLOW_FEED_TIMEOUTS[source.name]
+        feed_max_time = max(feed_max_time, conn_t * MAX_RETRIES + fetch_t * MAX_RETRIES + 120)
+
+    result = [None]
+    exception = [None]
+    timed_out = [False]
+
+    def target():
+        try:
+            result[0] = _fetch_feed_impl(source, max_articles)
+        except Exception as e:
+            exception[0] = e
+
+    thread = threading.Thread(target=target)
+    thread.daemon = True
+    thread.start()
+    thread.join(feed_max_time)
+
+    if thread.is_alive():
+        timed_out[0] = True
+        _safe_log(logging.WARNING, "[TIMEOUT] [%s] exceeded %ds, skipping", source.name, feed_max_time)
+        return []
+
+    if exception[0]:
+        _safe_log(logging.ERROR, "[ERROR] [%s] %s", source.name, str(exception[0]))
+        return []
+
+    return result[0] or []
+
+
+def _fetch_feed_impl(source: FeedSource, max_articles: int = 50) -> list[Article]:
+    """
+    获取单个订阅源的文章列表（内部实现）。
 
     改进点：
     1. 提取并记录热度分数
@@ -538,14 +613,26 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
         _safe_log(logging.WARNING, "[%s] Invalid feed URL: %s", source.name, error_msg)
         return []
 
-    # 加载已存在的文章（用于去重）
+    # 加载已存在的文章（用于去重）- 使用简化的查询
     db = SessionLocal()
     try:
+        # 只加载最近7天的文章哈希，避免全表扫描
+        from datetime import timedelta
+        recent_date = datetime.utcnow() - timedelta(days=7)
         existing_hashes = {
             row[0]
-            for row in db.query(Article.content_hash).filter(Article.content_hash.isnot(None)).all()
+            for row in db.query(Article.content_hash)
+            .filter(Article.content_hash.isnot(None))
+            .filter(Article.fetched_at >= recent_date)
+            .all()
         }
-        existing_urls = {row[0] for row in db.query(Article.url).all()}
+        existing_urls = set(
+            row[0]
+            for row in db.query(Article.url)
+            .filter(Article.fetched_at >= recent_date)
+            .all()
+        )
+        _safe_log(logging.INFO, "[LOAD] [%s] Loaded %d existing URLs for dedup", source.name, len(existing_urls))
     except Exception as e:
         _safe_log(logging.WARNING, "[%s] Failed to load existing articles: %s", source.name, str(e))
         existing_hashes = set()
@@ -555,7 +642,7 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
 
     # 带重试的 feed 获取
     content = _fetch_with_retry(source)
-    
+
     if content is None:
         _safe_log(logging.WARNING, "No content from %s (after retries)", source.name)
         return []
@@ -666,34 +753,54 @@ def fetch_feed(source: FeedSource, max_articles: int = 50) -> list[Article]:
             score=score,
         )
 
-        # 评审委员会自动评审
-        # 高质量来源：如果摘要为空，传递标题作为评审依据
+        # 评审委员会自动评审（带超时保护）
         try:
+            from review_committee import get_committee
             committee = get_committee()
-            # 高质量来源即使摘要为空也值得推荐
             review_text = summary if summary else title
-            review_result = committee.review(
-                article_id=None,
-                title=title,
-                text=review_text,
-                source_name=source.name,
-                published_at=published,
-                url=url
-            )
-
-            # 高质量来源 + 摘要为空的情况：如果是 D 改成 C
-            grade = review_result.grade
-            if grade == 'D' and source.name in HIGH_QUALITY_SOURCES and not summary:
-                grade = 'C'  # 降级处理但不直接过滤
-
-            article.review_grade = grade
-            article.review_score = int(review_result.total_score)
-            article.review_result = review_result.to_dict()
-            article.review_verdict = review_result.verdict
-            article.reviewed_at = review_result.reviewed_at
+            
+            # 评审结果存储
+            review_data = {'result': None, 'error': None}
+            
+            def do_review():
+                try:
+                    review_data['result'] = committee.review(
+                        article_id=None,
+                        title=title,
+                        text=review_text,
+                        source_name=source.name,
+                        published_at=published,
+                        url=url
+                    )
+                except Exception as e:
+                    review_data['error'] = str(e)
+            
+            import threading
+            t = threading.Thread(target=do_review)
+            t.daemon = True
+            t.start()
+            t.join(REVIEW_TIMEOUT)  # 最多等待评审超时
+            
+            if review_data['result']:
+                grade = review_data['result'].grade
+                if grade == 'D' and source.name in HIGH_QUALITY_SOURCES and not summary:
+                    grade = 'C'
+                article.review_grade = grade
+                article.review_score = int(review_data['result'].total_score)
+                article.review_result = review_data['result'].to_dict()
+                article.review_verdict = review_data['result'].verdict
+                article.reviewed_at = review_data['result'].reviewed_at
+            elif review_data['error']:
+                _safe_log(logging.WARNING, "Review error for %s: %s", title[:30], review_data['error'][:50])
+                article.review_grade = 'C'  # 评审失败时默认C级
+            else:
+                # 超时但无异常
+                _safe_log(logging.WARNING, "Review timeout for %s", title[:30])
+                article.review_grade = 'C'  # 超时默认C级
         except Exception as e:
             # 评审失败不影响文章保存
-            _safe_log(logging.WARNING, "Review failed for %s: %s", title[:30], str(e))
+            _safe_log(logging.DEBUG, "Review skipped for %s: %s", title[:30], str(e)[:30])
+            article.review_grade = 'C'  # 默认C级
 
         articles.append(article)
         fetched_count += 1
@@ -762,9 +869,10 @@ def fetch_all_feeds() -> dict:
             skipped_reasons.append(f"{source.name}: {error_msg}")
             _safe_log(logging.WARNING, "[SKIP] %s - %s", source.name, error_msg)
             continue
-        
+
         try:
-            articles = fetch_feed(source)
+            # 使用带超时的抓取函数
+            articles = _fetch_feed_with_timeout(source)
             total_seen += len(articles)
             
             if articles:

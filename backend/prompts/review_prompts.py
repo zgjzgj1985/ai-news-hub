@@ -21,7 +21,6 @@ GAME_DEV_SOURCES = [
     "GDC Vault",
     "80 Level",
     "r/ComfyUI",
-    "r/StableDiffusion",
     "r/GameAI",
     "Cursor Blog",
     "Windsurf Blog",
@@ -39,97 +38,102 @@ VIBE_CODING_SOURCES = [
 ]
 
 # =============================================================================
+# 来源加权系数 - 高质量来源的文章自动加分
+# =============================================================================
+
+SOURCE_WEIGHT_BOOST = {
+    # Vibe Coding 核心来源 +0.5
+    "Cursor Blog": 0.5,
+    "GitHub Blog": 0.5,
+    "DEV.to Cursor": 0.5,
+    "DEV.to AI Coding": 0.5,
+    "Simon Willison": 0.5,
+    # 高质量技术博客 +0.3
+    "Hugging Face Blog": 0.3,
+    "OpenAI Blog": 0.3,
+    "Google DeepMind Blog": 0.3,
+    # 开发者社区 +0.3
+    "DEV.to LLM": 0.3,
+    "DEV.to AI": 0.3,
+    "GitHub Trending All": 0.3,
+}
+
+# 学术来源降权系数
+SOURCE_WEIGHT_PENALTY = {
+    "ArXiv cs.AI": -0.3,
+    "ArXiv cs.CV (视觉)": -0.3,
+    "ArXiv cs.LG": -0.3,
+    "Papers with Code": -0.2,
+    "MIT Technology Review": -0.2,
+}
+
+
+def get_source_weight_boost(source_name: str) -> float:
+    """
+    获取来源加权系数
+
+    参数:
+        source_name: 来源名称
+
+    返回:
+        float: 加权系数（正数加分，负数降分）
+    """
+    return SOURCE_WEIGHT_BOOST.get(source_name, 0.0)
+
+
+def get_source_weight_penalty(source_name: str) -> float:
+    """
+    获取来源降权系数
+
+    参数:
+        source_name: 来源名称
+
+    返回:
+        float: 降权系数
+    """
+    return SOURCE_WEIGHT_PENALTY.get(source_name, 0.0)
+
+# =============================================================================
 # 系统提示词 - 游戏开发者专用评审标准
 # =============================================================================
 
-SYSTEM_PROMPT = """你是一个专为游戏开发者服务的AI内容评审委员会，专注于推荐：
-1. AI + 游戏设计/工作流
-2. 最新 AI 模型动态 (Deepseek V4、GPT-5 等)
-3. Vibe Coding 最佳实践
-4. 实用的 AI 工具/工作流
+SYSTEM_PROMPT = """你是AI内容评审委员会，专注于推荐：
+1. AI 编程工具和 Vibe Coding 最佳实践
+2. 最新 AI 模型动态和实用工具
+3. 开发者友好的 AI 应用案例
 
-【评审身份 - 5位专家】
-1. 游戏美术总监：评估AI绘图、资产生成、工作流
-2. 游戏策划主管：评估AI NPC、程序化生成、对话系统
-3. 技术美术：评估技术落地可行性、引擎集成
-4. 工具猎手：评估AI编程工具、Vibe Coding体验
-5. 质量守门员：确保内容实用、不过时
+【评审维度 - 加权评分】
 
-【核心评审标准 - 加权评分】
+| 维度 | 权重 | 说明 |
+|------|------|------|
+| 实用性 | 2.5 | 是否有可直接使用的工具/代码/教程？ |
+| AI相关度 | 1.5 | 与 AI 开发/编程的相关程度 |
+| 受众价值 | 1.0 | 是否适合开发者阅读 |
+| 技术深度 | 0.8 | 是否有实质性技术内容 |
+| 新颖性 | 1.2 | 是否介绍新模型/工具/方法 |
+| 生产价值 | 0.8 | 是否有可复用的代码/案例 |
 
-1. 实用性 (practicality)：0-10分，权重2.5 【最重要】
-   - 是否有可直接用于游戏项目的工具/工作流？
-   - 是否有可操作的教程、Prompt、LoRA？
-   - 是否有完整的工作流示例（ComfyUI、SD等）？
-   - 能否帮助解决游戏开发中的实际问题？
+【评分公式】
+加权总分 = (实用性*2.5 + AI相关度*1.5 + 受众价值*1.0 + 技术深度*0.8 + 新颖性*1.2 + 生产价值*0.8) / 7.8
 
-2. 游戏相关度 (game_relevance)：0-10分，权重1.5 【新增维度】
-   - 是否与游戏开发直接相关？
-   - AI游戏美术（资产生成、LoRA、ComfyUI工作流）→ +2分
-   - AI游戏策划（NPC、对话、程序化生成）→ +2分
-   - Vibe Coding / AI辅助编程 → +1分
-   - 通用AI新闻（非游戏）→ -2分
+【评级标准】
+- A级（强烈推荐）：加权>=6.5 且 实用性>=6
+- B级（推荐）：加权>=5.0 且 实用性>=5
+- C级（一般）：加权>=3.5
+- D级（过滤）：仅过滤垃圾内容
 
-3. 目标受众 (audience_value)：0-10分，权重1.0 【降低权重】
-   - 是否适合游戏开发者（美术/策划/程序）？
-   - 游戏相关内容加2分
+【加分规则】
+- Cursor/Windsurf/Copilot 使用技巧 → 实用性+1
+- 有完整代码示例 → 生产价值+1
+- 新模型发布（Deepseek/GPT/Claude）→ 新颖性+2
+- 来自 Cursor Blog/GitHub Blog → 实用性+0.5
 
-4. 技术深度 (tech_depth)：0-10分，权重0.8
-   - 是否有实质性技术内容？
-   - 允许有深度的游戏AI设计分析
+【降分规则】
+- 纯新闻报道（无技术分析）→ 新颖性-1, 实用性-1
+- 学术论文（无代码/无实战）→ 实用性-2
+- 与AI/编程无关 → AI相关度-2
 
-5. 新颖性 (novelty)：0-10分，权重1.2
-   - 是否介绍新模型/新工具/新方法？
-   - Deepseek、Qwen、GPT-5等新模型发布加2分
-   - 新游戏AI技术/工具加1分
-
-6. 生产价值 (production_value)：0-10分，权重0.8
-   - 是否有真实项目案例？
-   - 是否有可复用的代码/资源？
-
-【特别规则 - 游戏开发者优先】
-
-【A】游戏内容加分规则：
-   - AI + 游戏美术（资产生成、LoRA、ComfyUI工作流）→ game_relevance加2分
-   - AI + 游戏策划（NPC、对话、程序化生成）→ game_relevance加2分
-   - 有完整工作流截图/视频 → practicality加1分
-
-【B】AI模型动态优先规则：
-   - Deepseek V4/V3、GPT-5、Claude 4等新模型发布 → novelty加2分
-   - 有实际测试/对比 → novelty加1分
-   - 只要不是纯新闻报道，都应该给到B级以上
-
-【C】Vibe Coding 加分规则：
-   - Cursor、Windsurf、Copilot使用技巧 → practicality加1分
-   - 有实际项目案例 → production_value加1分
-   - AI辅助编程最佳实践 → practicality加2分
-
-【D】新闻报道宽容规则：
-   - 来自权威来源（机器之心、Hugging Face官方博客）→ 至少给B级
-   - 包含技术分析不是纯新闻 → 至少给B级
-   - 只有标题没有内容 → 降到C级
-
-【E】通用AI内容降级规则：【新增】
-   - 非游戏相关的模型发布/新闻 → audience_value降1分，game_relevance降2分
-   - 纯新闻报道（无技术分析/无实际应用）→ novelty降1分，practicality降1分
-   - 学术论文（无代码/无实战案例）→ practicality降2分，production_value降1分
-
-【评级标准 - 加权平均】（游戏开发者优先版）
-加权总分 = (practicality*2.5 + game_relevance*1.5 + audience_value*1.0 + novelty*1.2 + tech_depth*0.8 + production_value*0.8) / 7.8
-
-- A级（强烈推荐）：加权总分>=6.5，且practicality>=6
-- B级（推荐）：加权总分>=5.0，且practicality>=5
-- C级（一般）：加权总分>=3.5（降低阈值，让更多内容通过）
-- D级（过滤）：仅过滤明显垃圾内容
-
-【放宽后的过滤标准 - 只过滤以下情况】
-仅以下情况才给D级：
-- 纯广告/推广内容
-- 明显无效链接/资源已失效
-- 与AI和游戏开发完全无关（如纯币圈、纯股票预测）
-- 过时超过6个月的技术内容
-
-【输出格式 - 必须JSON】
+【输出格式 - 只输出JSON】
 {
   "grade": "A/B/C/D",
   "scores": {
@@ -140,11 +144,7 @@ SYSTEM_PROMPT = """你是一个专为游戏开发者服务的AI内容评审委�
     "novelty": 数字,
     "production_value": 数字
   },
-  "weighted_score": 数字,
-  "verdict": "简短裁决理由（20字以内）",
-  "strengths": ["优势1", "优势2"],
-  "weaknesses": ["劣势1", "劣势2"],
-  "recommendation": "是否推荐及理由（50字以内）"
+  "verdict": "简短裁决（20字以内）"
 }
 """
 
@@ -374,7 +374,7 @@ def calculate_total_score(scores: Dict[str, float]) -> float:
 
 def grade_from_scores(scores: Dict[str, float]) -> str:
     """
-    根据加权分数确定评级
+    根据加权分数确定评级（与 SYSTEM_PROMPT 中的阈值保持一致）
 
     参数:
         scores: 各维度分数
@@ -384,13 +384,13 @@ def grade_from_scores(scores: Dict[str, float]) -> str:
     """
     weighted = calculate_weighted_score(scores)
     practicality = scores.get("practicality", 5)
-    game_relevance = scores.get("game_relevance", 5)
 
-    if weighted >= 7.0 and practicality >= 6:
+    # 与 SYSTEM_PROMPT 中的阈值保持一致（第120-123行）
+    if weighted >= 6.5 and practicality >= 6:
         return "A"
-    elif weighted >= 5.5 and practicality >= 5:
+    elif weighted >= 5.0 and practicality >= 5:
         return "B"
-    elif weighted >= 4 and game_relevance >= 4:
+    elif weighted >= 3.5:  # 删除 game_relevance 条件，与 prompt 一致
         return "C"
     else:
         return "D"

@@ -1,69 +1,17 @@
 <template>
   <article class="article-card" @click="goToDetail">
     <div class="card-header">
-      <div class="card-meta">
-        <span class="source-name">{{ article.source_name }}</span>
-        <span class="dot"></span>
+      <div class="meta">
+        <span class="source">{{ article.source_name }}</span>
+        <span class="separator">—</span>
         <span class="date">{{ formatDate(article.published_at) }}</span>
-        <span class="dot"></span>
-        <span class="read-time">{{ article.read_time_minutes }} min</span>
       </div>
-      <div class="header-right">
-        <span
-          v-if="article.review_grade"
-          class="review-badge"
-          :class="gradeClass(article.review_grade)"
-          :title="article.review_verdict || '评审中'"
-        >
-          {{ article.review_grade }}
-        </span>
-        <span v-if="article.title_zh" class="translated-badge" title="已翻译">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17A15.9 15.9 0 0 1 4.17 12l1.47 1.47"/>
-            <path d="M21 11.5v2H11V2h2v9"/>
-            <path d="M11 22v-2h2v2h-2"/>
-          </svg>
-        </span>
-        <button
-          class="bookmark-btn"
-          :class="{ bookmarked: article.is_bookmarked }"
-          @click.stop="handleBookmark"
-          :title="article.is_bookmarked ? '取消收藏' : '收藏'"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" :fill="article.is_bookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-          </svg>
-        </button>
-      </div>
+      <span v-if="article.review_grade" class="grade" :class="'g' + article.review_grade">{{ article.review_grade }}</span>
     </div>
 
-    <h2 class="card-title">{{ displayTitle }}</h2>
+    <h2 class="title">{{ displayTitle }}</h2>
 
-    <p v-if="displaySummary" class="card-summary">{{ truncateSummary(displaySummary) }}</p>
-
-    <!-- 无摘要提示 -->
-    <div v-else class="no-summary-hint">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="16" x2="12" y2="12"/>
-        <line x1="12" y1="8" x2="12.01" y2="8"/>
-      </svg>
-      <span>该来源暂不支持摘要抓取</span>
-      <a
-        :href="article.url"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="direct-link"
-        @click.stop
-      >
-        直接查看原文
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-          <polyline points="15 3 21 3 21 9"/>
-          <line x1="10" y1="14" x2="21" y2="3"/>
-        </svg>
-      </a>
-    </div>
+    <p v-if="displaySummary" class="summary">{{ truncateSummary(displaySummary) }}</p>
 
     <div class="card-footer">
       <div class="tags">
@@ -72,29 +20,28 @@
           :key="tag"
           class="tag"
           :class="tagClass(tag)"
-          @click.stop="filterByTag(tag)"
         >{{ tag }}</span>
       </div>
-      <a
-        :href="article.url"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="read-link"
-        @click.stop
-        title="在原文阅读"
-      >
-        阅读原文
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-          <polyline points="15 3 21 3 21 9"/>
-          <line x1="10" y1="14" x2="21" y2="3"/>
-        </svg>
-      </a>
-    </div>
 
-    <div v-if="article.review_grade === 'D'" class="review-rejected">
-      <span class="rejected-label">评审未通过</span>
-      <span v-if="article.review_verdict" class="rejected-reason">{{ article.review_verdict }}</span>
+      <div class="actions">
+        <a
+          :href="article.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="link"
+          @click.stop
+        >阅读原文</a>
+        <button
+          class="bookmark"
+          :class="{ on: article.is_bookmarked }"
+          @click.stop="handleBookmark"
+          :title="article.is_bookmarked ? '取消收藏' : '添加收藏'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" :fill="article.is_bookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </article>
 </template>
@@ -111,20 +58,12 @@ const props = defineProps({
 const router = useRouter()
 const store = useArticleStore()
 
-// 优先显示翻译后的中文摘要
 const displaySummary = computed(() => {
-  if (props.article.summary_zh) {
-    return props.article.summary_zh
-  }
-  return props.article.summary
+  return props.article.summary_zh || props.article.summary
 })
 
-// 优先显示翻译后的中文标题
 const displayTitle = computed(() => {
-  if (props.article.title_zh) {
-    return props.article.title_zh
-  }
-  return props.article.title
+  return props.article.title_zh || props.article.title
 })
 
 const TAG_MAP = {
@@ -139,17 +78,6 @@ function tagClass(tag) {
   return TAG_MAP[tag] || 'tag-default'
 }
 
-const GRADE_COLORS = {
-  'A': { bg: '#10b981', label: '强烈推荐' },
-  'B': { bg: '#3b82f6', label: '推荐' },
-  'C': { bg: '#f59e0b', label: '待定' },
-  'D': { bg: '#6b7280', label: '过滤' },
-}
-
-function gradeClass(grade) {
-  return `grade-${grade.toLowerCase()}`
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -160,9 +88,9 @@ function formatDate(dateStr) {
   const diffDays = Math.floor(diffMs / 86400000)
 
   if (diffMins < 1) return '刚刚'
-  if (diffMins < 60) return `${diffMins} 分钟前`
-  if (diffHours < 24) return `${diffHours} 小时前`
-  if (diffDays < 7) return `${diffDays} 天前`
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 7) return `${diffDays}天前`
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
@@ -174,121 +102,100 @@ async function handleBookmark() {
   await store.toggle(props.article.id)
 }
 
-function filterByTag(tag) {
-  store.setTag(tag)
-  router.push('/')
-}
-
-// 截断摘要并智能分段落显示
-function truncateSummary(text, maxLength = 200) {
+function truncateSummary(text, maxLength = 120) {
   if (!text) return ''
-  // 移除HTML标签
   const plainText = text.replace(/<[^>]+>/g, '').trim()
   if (plainText.length <= maxLength) return plainText
-  // 智能截断，在句号处截断
-  const truncated = plainText.substring(0, maxLength)
-  const lastPunctuation = Math.max(
-    truncated.lastIndexOf('。'),
-    truncated.lastIndexOf('.'),
-    truncated.lastIndexOf('!'),
-    truncated.lastIndexOf('！')
-  )
-  if (lastPunctuation > maxLength * 0.6) {
-    return truncated.substring(0, lastPunctuation + 1) + '...'
-  }
-  return truncated + '...'
+  return plainText.substring(0, maxLength).trim() + '...'
 }
 </script>
 
 <style scoped>
 .article-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  transition: all var(--transition-fast);
 }
+
 .article-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-dim), var(--shadow-md);
-  transform: translateY(-2px);
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+  margin-left: calc(-1 * var(--space-6));
+  margin-right: calc(-1 * var(--space-6));
+  background: var(--bg-surface);
+  border-bottom-color: var(--border);
+}
+
+.article-card:hover .title {
+  color: var(--accent);
+}
+
+.article-card:last-child {
+  border-bottom: none;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: var(--space-2);
 }
 
-.card-meta {
+.meta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   color: var(--text-muted);
-  flex-wrap: wrap;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.source-name {
-  color: var(--accent);
+.source {
   font-weight: 600;
+  color: var(--text-secondary);
 }
 
-.dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  flex-shrink: 0;
+.separator {
+  opacity: 0.4;
 }
 
-.bookmark-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: var(--space-1);
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.bookmark-btn:hover {
-  color: var(--warning);
-  background: var(--bg-elevated);
-}
-.bookmark-btn.bookmarked {
-  color: var(--warning);
+.grade {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 2px;
+  opacity: 0.7;
 }
 
-.card-title {
-  font-size: var(--font-size-lg);
+.grade.gA { background: #1a1a1a; color: #fff; opacity: 1; }
+.grade.gB { background: #e5e5e5; color: #666; }
+.grade.gC { background: transparent; color: #aaa; border: 1px solid #ddd; }
+.grade.gD { background: transparent; color: #ccc; border: 1px solid #eee; }
+
+.title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.4;
-  transition: color var(--transition-fast);
-}
-.article-card:hover .card-title {
-  color: var(--accent);
+  line-height: 1.35;
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.01em;
 }
 
-.card-summary {
+.summary {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   line-height: 1.6;
+  margin-bottom: var(--space-3);
 }
 
 .card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-1);
 }
 
 .tags {
@@ -297,123 +204,40 @@ function truncateSummary(text, maxLength = 200) {
   gap: var(--space-2);
 }
 
-.read-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
-.read-link:hover {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.header-right {
+.actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
-.review-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  color: white;
-  cursor: default;
-}
-
-.translated-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-}
-
-.grade-a {
-  background: #10b981;
-}
-
-.grade-b {
-  background: #3b82f6;
-}
-
-.grade-c {
-  background: #f59e0b;
-}
-
-.grade-d {
-  background: #6b7280;
-  opacity: 0.6;
-}
-
-.no-summary-hint {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-elevated);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-}
-
-.no-summary-hint svg {
-  flex-shrink: 0;
-  color: var(--warning);
-}
-
-.direct-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--accent);
-  font-weight: 500;
-  text-decoration: none;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.direct-link:hover {
-  text-decoration: underline;
-}
-
-.review-rejected {
-  margin-top: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-elevated);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--text-muted);
-  opacity: 0.7;
-}
-
-.rejected-label {
-  display: block;
+.link {
   font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
 }
 
-.rejected-reason {
-  display: block;
-  font-size: var(--font-size-xs);
+.link:hover {
+  color: var(--accent);
+}
+
+.bookmark {
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  cursor: pointer;
   color: var(--text-muted);
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
+
+.bookmark:hover {
+  color: var(--accent);
+}
+
+.bookmark.on {
+  color: var(--accent);
 }
 </style>

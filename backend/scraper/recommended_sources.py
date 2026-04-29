@@ -80,11 +80,19 @@ RECOMMENDED_SOURCES = [
     },
     {
         "name": "Anthropic Blog",
-        "url": "https://www.anthropic.com/news/rss",
+        "url": "https://raw.githubusercontent.com/0xSMW/rss-feeds/main/feeds/feed_anthropic_news.xml",
         "category": "blog",
         "priority": 9,
-        "description": "Claude 模型开发商博客",
+        "description": "Claude 模型开发商博客，通过 GitHub 社区维护 RSS 获取",
         "tags": ["AI前沿", "工具推荐"],
+    },
+    {
+        "name": "Anthropic Engineering",
+        "url": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml",
+        "category": "blog",
+        "priority": 9,
+        "description": "Anthropic 工程团队博客，分享技术实践",
+        "tags": ["AI前沿", "使用技巧", "游戏策划"],
     },
     {
         "name": "Google DeepMind Blog",
@@ -150,15 +158,6 @@ RECOMMENDED_SOURCES = [
         "description": "本地LLM部署最活跃社区，实操经验多",
         "tags": ["AI前沿", "使用技巧", "游戏策划"],
         "quality_threshold": 20,
-    },
-    {
-        "name": "Reddit r/StableDiffusion",
-        "url": "https://www.reddit.com/r/StableDiffusion.rss",
-        "category": "community",
-        "priority": 8,
-        "description": "SD最活跃社区，工作流和技巧丰富",
-        "tags": ["游戏美术", "使用技巧"],
-        "quality_threshold": 15,
     },
     {
         "name": "Reddit r/ComfyUI",
@@ -312,6 +311,36 @@ RECOMMENDED_SOURCES = [
         "tags": ["AI前沿"],
     },
 
+    # --- AI 工程师访谈播客 ---
+    {
+        "name": "Latent Space Podcast",
+        "url": "https://api.substack.com/feed/podcast/1084089.rss",
+        "category": "newsletter",
+        "priority": 8,
+        "description": "AI 工程师访谈播客，含 Cursor/Claude/Google 工程师深度对话",
+        "tags": ["AI前沿", "使用技巧", "游戏策划"],
+    },
+
+    # --- AI 工程师个人博客 ---
+    {
+        "name": "Simon Willison",
+        "url": "https://simonwillison.net/atom/entries/",
+        "category": "blog",
+        "priority": 9,
+        "description": "AI Coding 专家，深度报道 Claude Code 和 Cursor",
+        "tags": ["使用技巧", "游戏策划", "Vibe Coding"],
+        "is_practical": True,
+    },
+    {
+        "name": "Thariq Shihipar",
+        "url": "https://www.thariq.io/",
+        "category": "blog",
+        "priority": 9,
+        "description": "Claude Code 核心工程师，分享 AI 编程实践",
+        "tags": ["使用技巧", "游戏策划", "Vibe Coding"],
+        "is_practical": True,
+    },
+
     # --- 游戏AI垂直 ---
     {
         "name": "Midjourney Styles",
@@ -348,7 +377,6 @@ AI_FRONTIER_SOURCES = [
 GAME_DEV_SOURCES = [
     "Hugging Face Blog",
     "Stability AI Blog",
-    "Reddit r/StableDiffusion",
     "Reddit r/ComfyUI",
     "Reddit r/GameAI",
     "Game Developer",

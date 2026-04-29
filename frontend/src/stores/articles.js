@@ -1,8 +1,26 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { fetchArticles, fetchStats, toggleBookmark } from '@/api'
 
+const STORAGE_KEY = 'ai-station-filters'
+
+function loadFilters() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return null
+}
+
+function saveFilters(filters) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filters))
+  } catch {}
+}
+
 export const useArticleStore = defineStore('articles', () => {
+  const saved = loadFilters()
+
   const articles = ref([])
   const total = ref(0)
   const page = ref(1)
@@ -11,12 +29,17 @@ export const useArticleStore = defineStore('articles', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  const activeTag = ref('')
-  const keyword = ref('')
+  const activeTag = ref(saved?.activeTag || '')
+  const keyword = ref(saved?.keyword || '')
   const sort = ref('newest')
-  const gradeFilter = ref('AB')  // 默认只显示 A+B 级通过评审的内容
+  const gradeFilter = ref(saved?.gradeFilter || '')  // 默认显示所有A/B/C级（D级垃圾信息不显示）
 
   const stats = ref(null)
+
+  // 持久化筛选条件
+  watch([activeTag, keyword, gradeFilter], () => {
+    saveFilters({ activeTag: activeTag.value, keyword: keyword.value, gradeFilter: gradeFilter.value })
+  })
 
   async function loadArticles() {
     loading.value = true
@@ -40,7 +63,9 @@ export const useArticleStore = defineStore('articles', () => {
 
   async function loadStats() {
     try {
-      stats.value = await fetchStats()
+      const params = {}
+      if (gradeFilter.value) params.grade = gradeFilter.value
+      stats.value = await fetchStats(params)
     } catch (e) {
       console.warn('Failed to load stats:', e.message)
     }
@@ -80,6 +105,7 @@ export const useArticleStore = defineStore('articles', () => {
     gradeFilter.value = grade
     page.value = 1
     loadArticles()
+    loadStats()  // 重新加载统计以更新标签数量
   }
 
   function setPage(p) {

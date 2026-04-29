@@ -20,32 +20,43 @@ def get_db():
 
 
 @router.get("/stats", response_model=StatsResponse)
-def get_stats(db: Session = Depends(get_db)):
+def get_stats(
+    db: Session = Depends(get_db),
+    grade: Optional[str] = Query(None, description="Filter by review grade: A/B/C/D or combined like 'AB'"),
+):
     # 只统计通过评审的内容（A/B/C 级），D 级是垃圾信息不计入
-    total_articles = db.query(Article).filter(Article.review_grade != 'D').count()
+    base_filter = Article.review_grade != 'D'
+
+    if grade:
+        grades = list(grade.upper())
+        base_filter = base_filter & Article.review_grade.in_(grades)
+
+    total_articles = db.query(Article).filter(base_filter).count()
     total_bookmarks = db.query(Bookmark).count()
     total_sources = db.query(FeedSource).count()
 
     now = datetime.utcnow()
     last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
-    # 只统计通过评审的内容
+
     articles_last_24h = db.query(Article).filter(
-        Article.fetched_at >= last_24h,
-        Article.review_grade != 'D'
+        Article.fetched_at >= last_24h, base_filter
     ).count()
     articles_last_7d = db.query(Article).filter(
-        Article.fetched_at >= last_7d,
-        Article.review_grade != 'D'
+        Article.fetched_at >= last_7d, base_filter
     ).count()
 
     from sqlalchemy import text
     tag_counts: dict[str, int] = {}
     # 只统计通过评审的内容的标签
+    grade_filter_sql = ""
+    if grade:
+        grade_list = "('" + "','".join(list(grade.upper())) + "')"
+        grade_filter_sql = f" AND articles.review_grade IN {grade_list}"
     result = db.execute(text(
         "SELECT json_each.value, COUNT(*) FROM articles, json_each(articles.tags) "
-        "WHERE articles.review_grade != 'D' "
-        "GROUP BY json_each.value"
+        "WHERE articles.review_grade != 'D'" + grade_filter_sql +
+        " GROUP BY json_each.value"
     ))
     for tag_name, count in result.fetchall():
         tag_counts[tag_name] = count

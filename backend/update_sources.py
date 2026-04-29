@@ -1,78 +1,105 @@
-"""
-更新订阅源为新的精选配置 - 游戏开发者专用版
+# -*- coding: utf-8 -*-
+"""更新订阅源URL脚本 - 修复失效的RSS源"""
 
-针对用户需求：
-1. AI + 游戏设计/工作流
-2. 最新 AI 模型动态 (Deepseek V4 等)
-3. Vibe coding 最佳实践
-4. 实用 AI 工具推荐
-"""
-import sys
-sys.path.insert(0, '.')
+import sqlite3
+import os
+from pathlib import Path
 
-from database import SessionLocal, FeedSource
+BASE_DIR = Path(__file__).resolve().parent.parent
+db_url = os.getenv("DATABASE_URL", "sqlite:///../data/articles.db")
+if db_url.startswith("sqlite:///"):
+    rel_path = db_url.replace("sqlite:///", "")
+    db_path = (BASE_DIR / rel_path).resolve()
 
-# 新的订阅源配置（游戏开发者专用精选源）
-GAME_DEV_SOURCES = [
-    # === AI 前沿动态（最新模型发布）===
-    {"name": "Hugging Face Blog", "url": "https://huggingface.co/blog/feed.xml", "category": "ai-frontier", "priority": 10},
-    {"name": "机器之心", "url": "https://www.jiqizhixin.com/rss", "category": "ai-frontier", "priority": 10},
-    {"name": "量子位", "url": "https://www.qbitai.com/feed", "category": "ai-frontier", "priority": 9},
+print("=" * 60)
+print("更新订阅源URL - 修复失效RSS")
+print("=" * 60)
 
-    # === 游戏 + AI 垂直源 ===
-    {"name": "Game Developer", "url": "https://www.gamedeveloper.com/rss.xml", "category": "game-dev", "priority": 9},
-    {"name": "r/LocalLLaMA", "url": "https://www.reddit.com/r/LocalLLaMA.rss", "category": "llm-community", "priority": 8},
-    {"name": "r/StableDiffusion", "url": "https://www.reddit.com/r/StableDiffusion.rss", "category": "game-art", "priority": 9},
-    {"name": "r/ComfyUI", "url": "https://www.reddit.com/r/ComfyUI.rss", "category": "game-art", "priority": 9},
-    {"name": "r/GameAI", "url": "https://www.reddit.com/r/gameai.rss", "category": "game-dev", "priority": 8},
+# 需要更新的订阅源映射
+SOURCE_UPDATES = [
+    # (原URL, 新URL, 新名称, 新优先级, 是否启用)
+    ("https://www.anthropic.com/blog/rss.xml",
+     "https://www.anthropic.com/news/feed_anthropic.xml",
+     "Anthropic Blog", 9, True),
 
-    # === Vibe Coding / AI 编程工具 ===
-    # Cursor Blog 官方 RSS 已失效，使用社区维护的 RSS 源
-    {"name": "Cursor Blog", "url": "https://raw.githubusercontent.com/leontloveless/ai-rss-feeds/main/feeds/cursor-blog.xml", "category": "vibe-coding", "priority": 9},
-    {"name": "Windsurf Blog", "url": "https://www.codeium.com/blog/rss.xml", "category": "vibe-coding", "priority": 9},
-    {"name": "GitHub Blog", "url": "https://github.blog/feed/", "category": "vibe-coding", "priority": 8},
-    {"name": "Anthropic Blog", "url": "https://www.anthropic.com/blog/rss.xml", "category": "vibe-coding", "priority": 8},
-    {"name": "OpenAI Blog", "url": "https://openai.com/blog/rss.xml", "category": "vibe-coding", "priority": 8},
-    {"name": "Hacker News AI", "url": "https://hnrss.org/newest?q=ai+code&count=15", "category": "vibe-coding", "priority": 7},
+    ("https://stability.ai/news/feed",
+     "https://stability.ai/news?format=rss",
+     "Stability AI Blog", 8, True),
 
-    # === 中文社区（工具推荐/使用技巧）===
-    {"name": "少数派", "url": "https://sspai.com/feed", "category": "tips", "priority": 8},
+    ("https://venturebeat.com/ai/feed/",
+     "https://venturebeat.com/feed/",
+     "VentureBeat AI", 7, True),
 
-    # === 学术 + 代码（有代码的论文）===
-    {"name": "Papers with Code", "url": "https://paperswithcode.com/feed", "category": "research", "priority": 6},
+    ("https://simonwillison.net/atom Eintraege",
+     "https://simonwillison.net/atom/everything/",
+     "Simon Willison", 7, True),
+
+    # Game Developer - 尝试备用源
+    ("https://www.gamedeveloper.com/rss.xml",
+     "http://www.gamasutra.com/rss/",  # Gamasutra是Game Developer的前身
+     "Game Developer", 6, True),
 ]
 
-def update_sources():
-    db = SessionLocal()
+conn = sqlite3.connect(str(db_path))
+cursor = conn.cursor()
 
-    # 删除旧的订阅源
-    old_sources = db.query(FeedSource).all()
-    print(f"删除 {len(old_sources)} 个旧订阅源:")
-    for s in old_sources:
-        print(f"  - {s.name}")
+updated_count = 0
+for old_url, new_url, new_name, new_priority, enabled in SOURCE_UPDATES:
+    cursor.execute("""
+        UPDATE feed_sources
+        SET url = ?, name = ?, priority = ?, enabled = ?
+        WHERE url = ?
+    """, (new_url, new_name, new_priority, enabled, old_url))
 
-    for s in old_sources:
-        db.delete(s)
-    db.commit()
+    if cursor.rowcount > 0:
+        print(f"[OK] 已更新: {new_name}")
+        print(f"      {old_url[:50]}...")
+        print(f"      -> {new_url}")
+        updated_count += cursor.rowcount
+    else:
+        print(f"[SKIP] 未找到匹配: {old_url[:50]}")
 
-    # 添加新的订阅源
-    print(f"\n添加 {len(GAME_DEV_SOURCES)} 个游戏开发者专用订阅源:")
-    for src in GAME_DEV_SOURCES:
-        source = FeedSource(**src)
-        db.add(source)
-        print(f"  + {src['name']} ({src['category']}) [priority={src['priority']}]")
+# 禁用无RSS的订阅源
+DISABLE_SOURCES = [
+    "https://www.deeplearning.ai/the-batch/rss/",
+    "https://www.minimaxi.com/news/rss",
+    "https://www.minimax.io/news",
+]
 
-    db.commit()
+print("\n禁用无RSS的订阅源...")
+for url in DISABLE_SOURCES:
+    cursor.execute("""
+        UPDATE feed_sources
+        SET enabled = 0, priority = 0
+        WHERE url = ?
+    """, (url,))
+    if cursor.rowcount > 0:
+        print(f"[OK] 已禁用: {url[:50]}")
 
-    # 验证
-    sources = db.query(FeedSource).order_by(FeedSource.priority.desc()).all()
-    print(f"\n当前订阅源 ({len(sources)} 个):")
-    for s in sources:
-        status = "enabled" if s.enabled else "disabled"
-        print(f"  [{status}] {s.name} - {s.url[:60]}...")
+conn.commit()
 
-    db.close()
-    print("\n订阅源更新完成!")
+# 显示当前状态
+print("\n" + "=" * 60)
+print("当前订阅源状态")
+print("=" * 60)
 
-if __name__ == "__main__":
-    update_sources()
+cursor.execute("""
+    SELECT name, enabled, priority, url
+    FROM feed_sources
+    ORDER BY priority DESC, name
+""")
+
+print("\n[启用的订阅源]")
+for row in cursor.fetchall():
+    name, enabled, priority, url = row
+    if enabled:
+        print(f"  [{priority}] {name}")
+
+print("\n[已禁用的订阅源]")
+cursor.execute("SELECT name, url FROM feed_sources WHERE enabled = 0")
+for row in cursor.fetchall():
+    name, url = row
+    print(f"  [0] {name}")
+
+print(f"\n总计更新: {updated_count} 个订阅源")
+conn.close()

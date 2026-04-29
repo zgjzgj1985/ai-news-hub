@@ -16,6 +16,7 @@ from prompts import (
     parse_review_result,
     calculate_total_score,
     grade_from_scores,
+    get_source_weight_boost,
 )
 
 logger = logging.getLogger(__name__)
@@ -248,7 +249,12 @@ class ReviewCommittee:
         if not self._use_llm:
             return False
         try:
-            return self.llm_client.is_available()
+            import requests
+            response = requests.get(
+                "http://localhost:11434/api/tags",
+                timeout=5
+            )
+            return response.status_code == 200
         except Exception as e:
             logger.warning(f"LLM服务检查失败: {e}")
             return False
@@ -344,7 +350,19 @@ class ReviewCommittee:
         # 计算总分和评级
         scores = result.llm_scores
         result.total_score = calculate_total_score(scores)
-        result.grade = parsed.get("grade") or grade_from_scores(scores)
+
+        # 应用来源加权系数
+        source_boost = get_source_weight_boost(source_name)
+        boosted_score = result.total_score + source_boost
+
+        # 使用加权后的分数重新计算评级
+        boosted_scores = scores.copy()
+        if source_boost != 0:
+            # 根据来源调整 practicality 分数
+            boosted_scores["practicality"] = min(10, scores.get("practicality", 5) + source_boost)
+            result.grade = parsed.get("grade") or grade_from_scores(boosted_scores)
+        else:
+            result.grade = parsed.get("grade") or grade_from_scores(scores)
 
         # 生成裁决
         grade = result.grade

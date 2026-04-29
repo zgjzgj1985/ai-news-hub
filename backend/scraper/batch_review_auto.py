@@ -29,14 +29,19 @@ def check_llm_status():
     print("LLM Status Check")
     print("=" * 60)
 
-    llm_client = get_llm_client()
-    available = llm_client.is_available()
+    import requests
+    try:
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        available = response.status_code == 200
+    except:
+        available = False
 
     if available:
         print(f"[OK] LLM Service: Connected")
-        print(f"     Model: {llm_client.model}")
-        print(f"     URL: {llm_client.base_url}")
-        models = llm_client.list_models()
+        print(f"     Model: qwen3.5:9b (configured)")
+        print(f"     URL: http://localhost:11434")
+        data = response.json()
+        models = [m.get("name", "") for m in data.get("models", [])]
         print(f"     Installed models: {', '.join(models) if models else 'None'}")
         return True
     else:

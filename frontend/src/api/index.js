@@ -30,7 +30,7 @@ export const updateSource = (id, data) => api.patch(`/sources/${id}`, data)
 export const deleteSource = (id) => api.delete(`/sources/${id}`)
 
 // ---- Stats ----
-export const fetchStats = () => api.get('/stats')
+export const fetchStats = (params) => api.get('/stats', { params })
 
 // ---- Review ----
 export const fetchReviewStats = () => api.get('/stats/review')

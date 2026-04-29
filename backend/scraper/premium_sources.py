@@ -40,14 +40,41 @@ BILIBILI_UIDS = {
 
 # X (Twitter) AI 大V账号
 TWITTER_ACCOUNTS = [
-    "karpathy",        # Andrej Karpathy
-    "ylecun",          # Yann LeCun
-    "swyx",            # swyx - Latent Space
-    "rasbt",           # Sebastian Raschka
-    "_akhaliq",        # AK - Papers/News
-    "sama",            # Sam Altman
-    "dair_ai",         # DAIR.AI
-    "AndrewYNg",       # Andrew Ng
+    # AI 公司创始人/核心成员
+    "karpathy",        # Andrej Karpathy (OpenAI 前研究科学家)
+    "ylecun",          # Yann LeCun (Meta AI 首席科学家)
+    "sama",            # Sam Altman (OpenAI CEO)
+    "AndrewYNg",       # Andrew Ng (AI 教育的领军人物)
+
+    # Cursor 工程师
+    "mntruell",        # Michael Truell (Cursor CEO)
+    "nickwm",          # Nick Miller (Cursor 工程师)
+    "saborii",         # Cursor 团队成员
+    "alexalbert__",    # Alex Albert (Cursor)
+
+    # Anthropic 工程师
+    "trq212",          # Thariq Shihipar (Claude Code 核心工程师)
+
+    # AI Coding / Vibe Coding 专家
+    "swyx",            # swyx (Latent Space 创始人)
+    "simonw",          # Simon Willison (AI Coding 专家)
+    "rasbt",           # Sebastian Raschka (AI 教育)
+    "_akhaliq",        # AK - Papers/News 汇总
+
+    # Google DeepMind 工程师
+    "jeffdean",        # Jeff Dean (Google 首席科学家)
+    "JohnLaTwC",       # John Lambert (Google AI)
+    "demaborisova",    # Boris DeGibson (Google AI)
+    "rsquared64",      # Google DeepMind 工程师
+
+    # 活跃的 AI 工程师/研究者
+    "dair_ai",         # DAIR.AI (AI 开源社区)
+    "bindureddy",      # Bindu Reddy (AI 领域)
+    "emollick",        # Ethan Mollick (AI 教育)
+    "levelsio",        # Levelsio (独立开发者)
+
+    # 中文 AI 工程师 (部分)
+    # 注：需要中文 RSS 源才能获取内容
 ]
 
 # RSSHub 实例列表

@@ -4,6 +4,9 @@
 对于摘要为空或过短的文章，自动抓取原文内容来补充摘要
 """
 import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, '.')
 
 import requests

@@ -13,6 +13,11 @@ from datetime import datetime
 # 添加 backend 目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Windows 控制台 UTF-8 编码
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from database import Article, SessionLocal
 from scraper.translator import (
     CHINESE_SOURCES,

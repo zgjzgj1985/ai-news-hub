@@ -54,19 +54,11 @@ def detect_language(text: str) -> str:
     return "en"
 
 
-TRANSLATION_PROMPT = """你是一个专业的技术文章翻译助手。请将以下英文技术文章翻译成简体中文。
+TRANSLATION_PROMPT = """将以下英文翻译为简体中文（简洁准确）：
 
-要求：
-1. 翻译准确、流畅，符合中文技术文章的表达习惯
-2. 保留关键的技术术语（如 AI、ML、API、GitHub、Copilot、Claude 等）
-3. 不要翻译代码片段、URL、专有名词
-4. 标题翻译要简洁、准确，通常不超过30字
-5. 只输出翻译结果，不要添加解释
-
-原文：
 {text}
 
-中文翻译："""
+中文："""
 
 
 async def translate_text(text: str, max_length: int = 2000) -> Optional[str]:
@@ -148,17 +140,7 @@ async def translate_title(title: str) -> Optional[str]:
             return None
 
         # 标题翻译提示 - 强调简洁
-        prompt = f"""请将以下英文标题翻译成简洁的中文标题。
-
-要求：
-1. 简洁准确，通常不超过30字
-2. 符合中文阅读习惯
-3. 保留关键技术术语
-4. 只输出翻译结果，不要解释
-
-原文：{title.strip()}
-
-中文标题："""
+        prompt = f"翻译为中文（简洁）：{title.strip()}\n中文："
 
         result = await client.generate(
             prompt=prompt,

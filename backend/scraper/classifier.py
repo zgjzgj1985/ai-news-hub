@@ -24,10 +24,51 @@ PRACTICAL_SOURCES = [
     "AI Stack Exchange",
     "Reddit r/LocalLLaMA",
     "Reddit r/ComfyUI",
-    "Reddit r/StableDiffusion",
     "Game Developer",
     "机器之心",
     "少数派",
+]
+
+# 游戏开发来源 - 启用宽松模式匹配
+GAME_DEV_SOURCES = [
+    "80 Level",
+    "Game Developer",
+    "r/GameAI",
+    "r/gamedev",
+    "r/StableDiffusion",
+    "r/ComfyUI",
+    "r/blender",
+    "r/unity3d",
+    "r/unrealengine",
+    "r/godot",
+    "Gamasutra",
+    "GDC",
+    "Unity Blog",
+    "Unreal Engine Blog",
+]
+
+# 宽松模式关键词 - 用于游戏开发来源
+# 这些关键词在游戏开发来源中会直接加分（不需要 game 上下文）
+GAME_ART_RELAXED_KEYWORDS = [
+    "pixel art", "splash art", "concept art", "character art", "environment art",
+    "sprite", "3D art", "2D art", "digital art", "matte painting",
+    "character design", "environment design", "level art", "prop art",
+    "texturing", "modeling", "rigging", "animation",
+    "game art", "game asset", "game character", "game environment",
+    "texture", "PBR", "normal map", "UV mapping",
+    "blender", "maya", "zbrush", "substance", "marmoset",
+    "game engine", "game engine", "ue5", "ue4", "unity3d",
+    "rendering", "render engine", "octane", "cycles",
+    "illustration", "painting", "drawing", "sketch",
+]
+
+GAME_PLAN_RELAXED_KEYWORDS = [
+    "game design", "gameplay", "game mechanic", "level design",
+    "NPC", "quest", "dialogue", "story", "narrative",
+    "AI NPC", "AI game", "procedural", "PCG",
+    "game balancing", "difficulty", "progression",
+    "RPG", "roguelike", "metroidvania", "MMO",
+    "game jam", "game dev", "indie game",
 ]
 
 # 学术论文特征 - 包含这些的文章会被降权
@@ -52,11 +93,62 @@ ACADEMIC_PATTERNS = [
 # Tag definitions with keywords and weights
 # weight: 1=普通关键词, 2=重要关键词, 3=核心关键词
 TAG_RULES = {
+    "vibe_coding": {
+        "core": [
+            # Vibe Coding 核心理念
+            "vibe coding", "vibe-coding", "vibe engineer",
+            "prompt to code", "natural language to code",
+            "ai coding workflow", "ai coding assistant",
+            "claude code", "cursor composer", "windsurf cascade",
+            "copilot workspace", "github copilot update",
+            "cursor best practice", "cursor tips", "cursor workflow",
+            "windsurf best practice", "windsurf tips", "windsurf workflow",
+            "aider", "continue dev", "devin", "replit agent",
+            "v0 dev", "bolt new", "lovable dev",
+            # AI Coding 具体实践
+            "building with ai", "ship with ai", "code with ai",
+            "claude for code", "github copilot",
+            "codeium windsurf", "tabnine",
+            "AI agent coding", "agentic coding workflow",
+            "pair programming with ai", "ai pair programmer",
+            # 具体使用技巧
+            "best cursor settings", "best copilot settings",
+            "cursor keyboard shortcuts", "copilot shortcuts",
+            "AI coding tips", "AI coding tricks",
+            "how I built with AI", "what I learned using AI to code",
+            # 开发者实践
+            "forrest chang", "andrej karpathy skills",
+            "awesome vibe coding", "cursor resources",
+        ],
+        "important": [
+            # AI 编程工具
+            "cursor", "windsurf", "copilot", "codeium", "tabnine",
+            "aider", "continue", "devin", "replit",
+            "v0", "bolt", "lovable", "framer dev",
+            # 编程实践
+            "LLM coding", "GPT coding", "AI pair programmer",
+            "AI code review", "AI refactoring",
+            "building with llm", "llm app development",
+            "RAG implementation", "AI agent",
+            # 开发工作流
+            "cursor rule", "cursor config", "cursor mcp",
+            "copilot chat", "copilot inline",
+            # 社区讨论
+            "HN: built with", "HN: ask: AI coding",
+            "my experience with AI coding",
+        ],
+        "general": [
+            "AI coding", "ai-assisted development",
+            "vibe engineering", "vibe dev",
+            "智能编码", "AI 开发助手",
+            "AI 软件开发", "人工智能编程",
+        ]
+    },
     "AI前沿": {
         "core": [
             # 最新模型发布（2024-2026）
             "gpt-5", "gpt4", "gpt-4o", "o1", "o3", "o4", "o4-mini",
-            "claude 4", "claude 3.5", "claude 3", "sonnet",
+            "claude opus", "claude 4", "claude 3.5", "claude 3", "sonnet",
             "gemini 2", "gemini 1.5", "gemini ultra",
             "llama 4", "llama 3.3", "llama 3.1", "llama 3", "llama-3",
             "mistral large", "mistral 3", "mixtral", "pixtral",
@@ -107,52 +199,36 @@ TAG_RULES = {
     "游戏美术": {
         "core": [
             # 游戏资产生成
-            "concept art", "character concept", "environment concept",
-            "game art", "game asset", "3d game art",
-            "texture generation", "texture synthesis",
-            "sprite sheet", "pixel art generation",
-            "AI game art", "AI asset", "procedural game art",
-            "stable diffusion game", "midjourney game", "SD game art",
-            "ComfyUI game", "game workflow", "ComfyUI workflow",
-            "game asset generation", "AI character", "AI creature",
-            "game prop", "game weapon", "game armor",
-            "tileable texture", "PBR texture", "normal map",
-            # 3D资产生成
-            "3D generation", "tripoSR", "tripo3d", "LRM",
-            "meshy", "recraft 3D", "spline AI",
-            "text-to-3D", "image-to-3D", "3D model generation",
+            # 游戏资产生成 - 必须有明确的游戏上下文
+            "game art", "game asset", "game character", "game environment",
+            "game prop", "game weapon", "game armor", "game icon",
+            "sprite sheet", "sprite generation", "pixel art game",
+            "AI game art", "AI game asset", "AI game character",
+            "stable diffusion for games", "midjourney for games",
+            "ComfyUI game", "game workflow", "ComfyUI workflow game",
+            "game asset generation", "AI creature game",
+            "tileable texture game", "PBR texture game",
+            # 3D游戏资产生成
+            "3D game asset", "game 3D", "text-to-3D game",
+            "tripoSR game", "tripo3d game", "meshy game",
+            "recraft 3D game", "spline AI game",
             # 游戏动画/绑定
-            "motion capture", "face capture", "performance capture",
-            "character rigging", "skeletal animation",
+            "game motion capture", "game animation", "game rigging",
             # 引擎集成
-            "unreal engine 5", "UE5 ai", "unity ml-agents",
+            "unreal engine game", "UE5 game", "unity game asset",
             "ue5 marketplace", "unreal marketplace asset",
         ],
         "important": [
-            "stable diffusion", "midjourney", "dalle", "flux", "Leonardo AI",
-            "LoRA game", "LoRA training", "checkpoint training",
-            "ControlNet", "IP-Adapter", "C站助词",
-            "DCC tool", "blender ai", "maya ai",
-            "character design", "character concept art",
-            "environment art", "environment design",
-            "procedural texture", "procedural generation art",
-            "AI illustration", "AI concept", "AI storyboard",
-            # AI绘图工具
-            "comfyui", "automatic1111", "forge webui", "sd webui",
-            "invokeAI", " fooocus", "秋葉aaaki", "赛博nb",
-            # LoRA相关
-            "lora", "lycoris", "checkpoint", "vae", "embedding",
-            "hypernetwork", "dreambooth", "training",
-            # 游戏美术流程
-            "game art pipeline", "asset pipeline", "美术工作流",
-            "AI art generation", "generative art",
-            "style transfer", "img2img", "图生图", "文生图",
+            # 游戏美术专用的AI工具关键词
+            "game LoRA", "LoRA training game",
+            "ControlNet game", "IP-Adapter game",
+            "DCC tool game", "blender game", "maya game",
+            "game art pipeline", "game asset pipeline", "美术工作流",
         ],
         "general": [
-            "texture", "3d", "3D", "asset", "game asset",
-            "unreal engine", "unity", "blender", "maya", "houdini",
-            "digital art", "digital painting", "matte painting",
-            "sprite", "icon", "ui design", "游戏美术",
+            # 仅保留强游戏上下文的通用词汇
+            "game art", "game asset", "game sprite", "game icon", "game ui",
+            "unreal engine", "unity 3d", "blender game", "游戏美术",
         ]
     },
     "游戏策划": {
@@ -175,16 +251,17 @@ TAG_RULES = {
             "unreal metahuman", "npc dialogue ai",
         ],
         "important": [
+            # 游戏策划专用的AI NPC和游戏系统关键词
             "NPC behavior", "NPC AI", "enemy AI", "pathfinding",
             "behavior tree", "state machine", "utility AI",
-            "game AI", "gameplay AI", "smart NPC",
+            "game AI", "smart NPC",
             "conversation system", "dialogue tree", "branching narrative",
             "world building", "lore generation", "backstory generation",
             "character AI", "AI ally", "AI antagonist",
             "procedural quest", "dynamic event", "dynamic narrative",
             "story-driven", "choice system", "player agency",
             "game narrative", "interactive fiction", "visual novel",
-            "AI storyteller", "AI writer", "AI editor",
+            "AI storyteller", "AI editor",
             # 游戏策划工具
             "AI writing", "AI narrative", "AI storytelling",
             "procedural content generation", "PCG",
@@ -193,11 +270,17 @@ TAG_RULES = {
             "AI dungeon", "AI roguelike", "roguelike AI",
             "procedural narrative", "auto storytelling",
             "game jam AI", "Ludum Dare AI",
+            # 以下为高风险误匹配词，已移除：
+            # conversation AI, dialogue generation (太通用，AI模型发布/技术文章也会匹配)
+            # AI writer (太通用)
+            # game gameplay AI (gameplay 太通用)
         ],
         "general": [
-            "NPC", "quest", "dialogue", "story", "narrative",
-            "gameplay", "game design", "level design",
-            "游戏策划", "关卡设计", "剧情设计", "游戏玩法",
+            # 仅保留游戏策划专用的通用词汇
+            "NPC", "quest",
+            "game design", "level design", "游戏策划", "关卡设计", "剧情设计", "游戏玩法",
+            # 以下为高风险误匹配词，已移除：
+            # dialogue, story, narrative, gameplay (太通用，AI模型发布/技术文章也会匹配)
         ]
     },
     "使用技巧": {
@@ -309,56 +392,64 @@ EXCLUDE_PATTERNS = [
 ]
 
 # 来源质量权重 - 某些来源的内容质量更高
-# 游戏开发者关注的来源权重更高
 SOURCE_QUALITY_WEIGHT = {
     # AI 公司博客 - 权威来源
-    "OpenAI Blog": 2.0,
-    "Hugging Face Blog": 2.2,  # 提高（游戏+AI工作流丰富）
+    "OpenAI Blog": 2.5,
+    "Hugging Face Blog": 2.5,
     "Stability AI Blog": 2.0,
-    "Google DeepMind Blog": 2.0,
-    "Cursor Blog": 2.5,  # Vibe Coding 核心来源
-    "Anthropic Blog": 1.8,
+    "Google DeepMind Blog": 2.5,
 
-    # 游戏开发社区 - 游戏开发者重点关注（权重2.5）
+    # Vibe Coding 核心来源 - 最高权重
+    "Cursor Blog (社区RSS)": 3.0,
+    "GitHub Blog": 2.5,
+    "GitHub Trending": 2.0,
+    "Simon Willison": 3.0,  # AI Coding 专家
+
+    # DEV.to 开发者社区 - Vibe Coding 内容丰富
+    "DEV.to": 2.5,
+    "DEV.to Cursor": 3.0,
+    "DEV.to AI Coding": 3.0,
+    "DEV.to LLM": 2.5,
+    "DEV.to AI": 2.5,
+
+    # 游戏开发社区
     "Game Developer": 2.5,
     "GDC Vault": 2.5,
     "80 Level": 2.5,
-    "r/ComfyUI": 2.2,  # 游戏美术核心
-    "r/StableDiffusion": 2.0,  # 游戏美术
-    "r/LocalLLaMA": 1.8,  # LLM 本地部署
-    "r/GameAI": 2.5,  # 游戏AI核心
+    "Reddit r/ComfyUI": 2.2,
+    "Reddit r/LocalLLaMA": 1.8,
+    "Reddit r/GameAI": 2.5,
 
-    # Vibe Coding 来源 - 高权重
-    "Windsurf Blog": 2.5,
-    "GitHub Blog": 2.0,
-    # 注: Cursor Blog RSS 已失效
+    # Newsletter
+    "Latent Space": 2.5,
+    "The Gradient": 2.0,
+    "Import AI Newsletter": 2.0,
 
-    # 社区问答 - 实用技巧
-    "AI Stack Exchange": 1.8,
-    "Papers with Code": 1.5,  # 有代码的论文
+    # AI 工具平台
+    "Product Hunt": 2.0,
+    "Future Tools": 2.0,
 
-    # 中文媒体 - 深度分析
-    "机器之心": 2.0,  # 提高
-    "量子位": 1.8,
-    "少数派": 1.8,  # 工具使用技巧
+    # 技术博客
+    "Supabase Blog": 2.2,
+    "Medium AI": 1.5,
 
-    # 通用新闻源 - 降权（内容杂，权重0.5）
+    # 中文媒体
+    "机器之心": 2.2,
+    "量子位": 2.0,
+    "少数派": 2.2,
+
+    # 通用新闻源 - 降权
     "Hacker News AI": 0.5,
-    "MIT Technology Review": 0.5,
-    "The Verge AI": 0.5,
-    "TechCrunch AI": 0.5,
+    "MIT Technology Review": 0.6,
+    "TechCrunch AI": 0.6,
+    "VentureBeat AI": 0.5,
     "Wired AI": 0.5,
-    "ArXiv cs.AI": 0.3,
-    "ArXiv cs.CV": 0.3,
-    "ArXiv cs.LG": 0.3,
-    "Import AI": 1.0,
-    "Last Week in AI": 1.0,
-    "The Batch": 1.0,
+    "Ars Technica AI": 0.5,
 
-    # AI 工具资讯 - 中等权重
-    "Product Hunt": 1.8,
-    "There's an AI for That": 1.5,
-    "Future Tools": 1.5,
+    # 学术来源 - 大幅降权
+    "ArXiv cs.AI": 0.2,
+    "ArXiv cs.CV (视觉)": 0.2,
+    "ArXiv cs.LG": 0.2,
 }
 
 
@@ -420,6 +511,8 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
     4. 排除词机制过滤噪音
     5. 学术来源降权，实用来源加权
     6. 新增生产落地标签识别
+    7. Vibe Coding 来源优先匹配 vibe_coding 标签
+    8. 游戏开发来源启用宽松模式匹配
     """
     text_lower = text.lower()
     title_lower = (title or "").lower()
@@ -433,6 +526,17 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
     # 检测是否为学术内容
     is_academic = is_academic_content(combined_lower, source_name)
 
+    # Vibe Coding 核心来源列表
+    VIBE_CODING_CORE_SOURCES = [
+        # AI Coding 工具
+        "Cursor Blog", "Cursor Blog (社区RSS)", "GitHub Blog", "GitHub Trending",
+        "Simon Willison",
+        # DEV.to 开发者社区
+        "DEV.to", "DEV.to Cursor", "DEV.to AI Coding", "DEV.to LLM", "DEV.to AI",
+        # Newsletter
+        "Latent Space",
+    ]
+
     tag_scores = {}
 
     for tag in TAG_RULES.keys():
@@ -442,16 +546,51 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
         source_weight = SOURCE_QUALITY_WEIGHT.get(source_name, 1.0)
 
         # 学术来源降权
-        if is_academic and tag == "AI前沿":
-            source_weight *= 0.5
+        if is_academic and tag in ["AI前沿", "工具推荐", "使用技巧"]:
+            source_weight *= 0.3  # 大幅降低学术来源权重
+
         # 实用来源加权
         elif source_name in PRACTICAL_SOURCES and tag in ["使用技巧", "工具推荐", "生产落地"]:
             source_weight *= 1.5
+
+        # Vibe Coding 来源优先匹配 vibe_coding 标签
+        if source_name in VIBE_CODING_CORE_SOURCES and tag == "vibe_coding":
+            source_weight *= 2.0  # Vibe Coding 来源的文章更容易被标记为 vibe_coding
 
         score *= source_weight
 
         if score > 0:
             tag_scores[tag] = score
+
+        # 游戏开发来源启用宽松模式匹配
+    is_game_dev_source = source_name in GAME_DEV_SOURCES
+    if is_game_dev_source:
+        # 游戏美术宽松模式加分
+        art_relaxed_score = 0.0
+        for kw in GAME_ART_RELAXED_KEYWORDS:
+            if kw.lower() in title_lower:
+                art_relaxed_score += 2.0
+            elif kw.lower() in text_lower:
+                art_relaxed_score += 1.0
+
+        # 游戏策划宽松模式加分
+        plan_relaxed_score = 0.0
+        for kw in GAME_PLAN_RELAXED_KEYWORDS:
+            if kw.lower() in title_lower:
+                plan_relaxed_score += 2.0
+            elif kw.lower() in text_lower:
+                plan_relaxed_score += 1.0
+
+        # 应用宽松模式分数
+        if "游戏美术" in tag_scores:
+            tag_scores["游戏美术"] += art_relaxed_score
+        elif art_relaxed_score >= 2.0:  # 标题中1个关键词即可触发
+            tag_scores["游戏美术"] = 5.0  # 直接设置为通过阈值
+
+        if "游戏策划" in tag_scores:
+            tag_scores["游戏策划"] += plan_relaxed_score
+        elif plan_relaxed_score >= 2.0:
+            tag_scores["游戏策划"] = 5.0  # 直接设置为通过阈值
 
     # 学术内容强制添加生产落地标签检查（如果没匹配则降级）
     if is_academic and "生产落地" not in tag_scores:
@@ -461,18 +600,27 @@ def classify(text: str, source_name: str = "", title: str = "") -> list[str]:
             # 纯学术内容降级处理
             pass  # 不做额外处理，让评审阶段过滤
 
-    # 至少有2分以上才打标签
-    MIN_SCORE = 2.0
+    # 至少5分以上才打标签（提高阈值避免单关键词误匹配）
+    MIN_SCORE = 5.0
 
     matched_tags = [tag for tag, score in tag_scores.items() if score >= MIN_SCORE]
+
+    # Vibe Coding 核心来源的文章，即使分数不够也优先打 vibe_coding 标签
+    if source_name in VIBE_CODING_CORE_SOURCES and "vibe_coding" not in matched_tags:
+        vibe_score = _calculate_tag_score("vibe_coding", text_lower, title_lower)
+        if vibe_score >= 1.0:  # 只要有1分以上就打标签
+            matched_tags.append("vibe_coding")
 
     # 如果没有任何标签命中，但来源是AI专业源，默认打AI前沿
     if not matched_tags and source_name in [
         "OpenAI Blog", "Hugging Face Blog", "Stability AI Blog",
-        "Google DeepMind Blog", "AI Stack Exchange", "ArXiv cs.AI",
-        "ArXiv cs.CV", "ArXiv cs.LG", "机器之心", "量子位",
+        "Google DeepMind Blog", "AI Stack Exchange", "机器之心", "量子位",
         "Import AI", "Last Week in AI", "The Batch",
     ]:
         matched_tags = ["AI前沿"]
+
+    # ArXiv 默认不自动打标签，让评审阶段过滤
+    if not matched_tags and is_academic:
+        return []  # 返回空列表，不自动打任何标签
 
     return sorted(matched_tags) if matched_tags else ["AI前沿"]

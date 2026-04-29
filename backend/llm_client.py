@@ -2,13 +2,17 @@
 
 import json
 import logging
+import os
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv()
+# 尝试加载.env文件
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path, override=True)  # 强制覆盖系统环境变量
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +41,7 @@ class LLMClient:
 
     DEFAULT_MODEL = "qwen3.5:9b"
     DEFAULT_BASE_URL = "http://localhost:11434"
-    DEFAULT_TIMEOUT = 60
+    DEFAULT_TIMEOUT = 120
 
     def __init__(
         self,
@@ -45,26 +49,14 @@ class LLMClient:
         base_url: Optional[str] = None,
         timeout: int = DEFAULT_TIMEOUT,
         temperature: float = 0.1,
-        max_retries: int = 3
+        max_retries: int = 2
     ):
-        """
-        初始化LLM客户端
-
-        参数:
-            model: 模型名称，默认 qwen3.5:9b
-            base_url: Ollama服务地址，默认 http://localhost:11434
-            timeout: 请求超时时间（秒）
-            temperature: 温度参数，越低越稳定
-            max_retries: 最大重试次数
-        """
-        import os
-
+        """初始化LLM客户端"""
         self.model = model or os.getenv("LLM_MODEL", self.DEFAULT_MODEL)
         self.base_url = base_url or os.getenv("LLM_BASE_URL", self.DEFAULT_BASE_URL)
         self.timeout = timeout
         self.temperature = temperature
         self.max_retries = max_retries
-
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:

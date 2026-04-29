@@ -9,6 +9,9 @@ from .review_prompts import (
     parse_review_result,
     calculate_total_score,
     grade_from_scores,
+    get_source_weight_boost,
+    SOURCE_WEIGHT_BOOST,
+    SOURCE_WEIGHT_PENALTY,
 )
 
 __all__ = [
@@ -20,4 +23,7 @@ __all__ = [
     "parse_review_result",
     "calculate_total_score",
     "grade_from_scores",
+    "get_source_weight_boost",
+    "SOURCE_WEIGHT_BOOST",
+    "SOURCE_WEIGHT_PENALTY",
 ]

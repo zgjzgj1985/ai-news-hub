@@ -7,8 +7,27 @@ import sys
 sys.path.insert(0, '.')
 
 from database import SessionLocal, FeedSource
-from scraper.sources import FEED_SOURCES
+from scraper.sources import FEED_SOURCES, GITHUB_TRENDING_SOURCES, NEWSLETTER_SOURCES
 from scraper.rss_parser import fetch_all_feeds
+
+
+def get_all_sources():
+    """获取所有订阅源配置的合并字典"""
+    all_sources = {}
+
+    # 添加 GitHub Trending 订阅源
+    for key, config in GITHUB_TRENDING_SOURCES.items():
+        all_sources[f"github_{key}"] = config
+
+    # 添加 Newsletter 订阅源
+    for key, config in NEWSLETTER_SOURCES.items():
+        all_sources[f"newsletter_{key}"] = config
+
+    # 添加原有订阅源
+    all_sources.update(FEED_SOURCES)
+
+    return all_sources
+
 
 def init_sources():
     """初始化所有 RSS 来源到数据库"""
@@ -16,11 +35,14 @@ def init_sources():
 
     print("=== 初始化 RSS 来源 ===\n")
 
+    # 获取所有订阅源
+    all_sources = get_all_sources()
+
     added = 0
     updated = 0
     skipped = 0
 
-    for key, config in FEED_SOURCES.items():
+    for key, config in all_sources.items():
         name = config["name"]
         url = config["url"]
         category = config.get("category", "general")
